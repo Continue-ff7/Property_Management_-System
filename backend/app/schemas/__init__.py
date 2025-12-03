@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime, date
 from decimal import Decimal
@@ -15,6 +15,60 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
     role: str
+
+
+class OwnerCreate(UserBase):
+    """业主创建（不需要role字段）"""
+    password: str
+    
+    @field_validator('email', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == '':
+            return None
+        return v
+
+
+class OwnerUpdate(BaseModel):
+    """业主更新（password可选）"""
+    name: str
+    phone: str
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+    
+    @field_validator('email', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == '':
+            return None
+        return v
+
+
+class MaintenanceCreate(UserBase):
+    """维修人员创建（不需要role字段）"""
+    password: str
+    
+    @field_validator('email', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == '':
+            return None
+        return v
+
+
+class MaintenanceUpdate(BaseModel):
+    """维修人员更新（password可选）"""
+    name: str
+    phone: str
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+    
+    @field_validator('email', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == '':
+            return None
+        return v
 
 
 class UserLogin(BaseModel):
@@ -109,11 +163,37 @@ class BillResponse(BillBase):
     
     class Config:
         from_attributes = True
+        json_encoders = {
+            Decimal: lambda v: float(v)
+        }
 
 
 class BillWithDetails(BillResponse):
     owner_name: str
     property_info: str  # 例如: "1栋2单元301"
+
+
+class BillBatchCreateRequest(BaseModel):
+    """批量生成账单请求"""
+    fee_type: str  # 费用类型
+    billing_period: str  # 账期，例如："2024-01"
+    due_date: date  # 截止日期
+    owner_ids: Optional[List[int]] = None  # 指定业主，为None则为全部
+
+
+class SingleBillCreate(BaseModel):
+    """单条账单创建"""
+    property_id: int
+    fee_type: str
+    amount: Decimal
+    billing_period: str
+    due_date: date
+
+
+class BillBatchCreateByOwnerRequest(BaseModel):
+    """为指定业主生成账单"""
+    owner_id: int
+    bills: List[SingleBillCreate]
 
 
 class PaymentRequest(BaseModel):
@@ -227,6 +307,9 @@ class FeeStandardResponse(BaseModel):
     
     class Config:
         from_attributes = True
+        json_encoders = {
+            Decimal: lambda v: float(v)
+        }
 
 
 # ============= AI客服相关 =============

@@ -1,0 +1,29 @@
+{
+  "name": "property-management-admin",
+  "version": "1.0.0",
+  "description": "智慧物业管理系统 - 管理员端",
+  "private": true,
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build",
+    "lint": "vue-cli-service lint"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "axios": "^1.6.0",
+    "core-js": "^3.8.3",
+    "echarts": "^5.4.3",
+    "element-plus": "^2.4.4",
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.5",
+    "vuex": "^4.1.0"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "~5.0.0",
+    "@vue/cli-plugin-router": "~5.0.0",
+    "@vue/cli-plugin-vuex": "~5.0.0",
+    "@vue/cli-service": "~5.0.0",
+    "sass": "^1.69.5",
+    "sass-loader": "^13.3.2"
+  }
+}

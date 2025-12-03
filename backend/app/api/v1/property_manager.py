@@ -7,18 +7,20 @@ from app.models import (
 )
 from app.schemas import (
     UserCreate, UserResponse, PropertyCreate, PropertyWithOwner,
-    BillCreate, BillWithDetails, BillResponse,
+    BillCreate, BillWithDetails, BillResponse, BillBatchCreateRequest, 
+    BillBatchCreateByOwnerRequest, SingleBillCreate,
     RepairOrderWithDetails, RepairOrderUpdate,
     AnnouncementCreate, AnnouncementUpdate, AnnouncementWithPublisher,
     FeeStandardCreate, FeeStandardUpdate, FeeStandardResponse,
     BuildingCreate, BuildingResponse,
     RevenueStatistics, RepairStatistics, OwnerStatistics,
-    MessageResponse
+    MessageResponse, OwnerCreate, MaintenanceCreate, OwnerUpdate, MaintenanceUpdate
 )
 from typing import List
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 from tortoise.functions import Count, Sum
+from tortoise.expressions import Q
 
 router = APIRouter()
 
@@ -29,13 +31,21 @@ async def get_owners(
     skip: int = 0,
     limit: int = 50,
     search: str = None,
+    include_inactive: bool = False,
     current_user: User = Depends(get_current_manager)
 ):
     """查看业主列表"""
     query = User.filter(role=UserRole.OWNER)
     
+    # 默认只显示活跃的业主，除非明确指定包含停用的
+    if not include_inactive:
+        query = query.filter(is_active=True)
+    
     if search:
-        query = query.filter(name__icontains=search) | query.filter(phone__icontains=search)
+        # 修复搜索逻辑
+        query = query.filter(
+            Q(name__icontains=search) | Q(phone__icontains=search) | Q(username__icontains=search)
+        )
     
     owners = await query.offset(skip).limit(limit).order_by("-created_at")
     return owners
@@ -55,7 +65,7 @@ async def get_owner_detail(
 
 @router.post("/owners", response_model=UserResponse)
 async def create_owner(
-    owner_data: UserCreate,
+    owner_data: OwnerCreate,
     current_user: User = Depends(get_current_manager)
 ):
     """创建业主"""
@@ -78,7 +88,7 @@ async def create_owner(
 @router.put("/owners/{owner_id}", response_model=UserResponse)
 async def update_owner(
     owner_id: int,
-    owner_data: UserCreate,
+    owner_data: OwnerUpdate,
     current_user: User = Depends(get_current_manager)
 ):
     """修改业主信息"""
@@ -97,18 +107,52 @@ async def update_owner(
 
 
 @router.delete("/owners/{owner_id}", response_model=MessageResponse)
-async def deactivate_owner(
+async def delete_owner(
     owner_id: int,
+    force: bool = False,
     current_user: User = Depends(get_current_manager)
 ):
-    """注销业主账户"""
+    """删除业主账户（真删除）"""
     owner = await User.get_or_none(id=owner_id, role=UserRole.OWNER)
     if not owner:
         raise HTTPException(status_code=404, detail="业主不存在")
     
-    owner.is_active = False
-    await owner.save()
-    return MessageResponse(message="业主账户已注销")
+    # 检查是否有关联的房产
+    property_count = await Property.filter(owner_id=owner_id).count()
+    
+    # 检查是否有关联的账单
+    bill_count = await Bill.filter(owner_id=owner_id).count()
+    
+    # 检查是否有关联的报修工单
+    repair_count = await RepairOrder.filter(owner_id=owner_id).count()
+    
+    # 如果有任何关联数据且不是强制删除，则不允许删除
+    if (property_count > 0 or bill_count > 0 or repair_count > 0) and not force:
+        error_msg = []
+        if property_count > 0:
+            error_msg.append(f"{property_count}个房产")
+        if bill_count > 0:
+            error_msg.append(f"{bill_count}条账单")
+        if repair_count > 0:
+            error_msg.append(f"{repair_count}个报修工单")
+        
+        raise HTTPException(
+            status_code=400, 
+            detail=f"该业主有{', '.join(error_msg)}，不允许删除。请先处理完相关数据。"
+        )
+    
+    # 如果强制删除，先解绑所有房产、删除账单和报修工单
+    if force:
+        if property_count > 0:
+            await Property.filter(owner_id=owner_id).update(owner_id=None)
+        if bill_count > 0:
+            await Bill.filter(owner_id=owner_id).delete()
+        if repair_count > 0:
+            await RepairOrder.filter(owner_id=owner_id).delete()
+    
+    # 真删除
+    await owner.delete()
+    return MessageResponse(message="业主账户已删除")
 
 
 @router.get("/owners/{owner_id}/properties", response_model=List[PropertyWithOwner])
@@ -164,6 +208,8 @@ async def create_building(
 @router.get("/properties", response_model=List[PropertyWithOwner])
 async def get_properties(
     building_id: int = None,
+    owner_id: int = None,
+    unassigned: bool = False,
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_manager)
@@ -173,6 +219,13 @@ async def get_properties(
     
     if building_id:
         query = query.filter(building_id=building_id)
+    
+    if owner_id:
+        query = query.filter(owner_id=owner_id)
+    
+    # 查询未分配的房产
+    if unassigned:
+        query = query.filter(owner_id__isnull=True)
     
     properties = await query.offset(skip).limit(limit).prefetch_related("building", "owner")
     
@@ -226,6 +279,41 @@ async def create_property(
         "owner_name": property_obj.owner.name if property_obj.owner else None,
         "building_name": property_obj.building.name
     }
+
+
+@router.put("/properties/{property_id}/assign-owner", response_model=MessageResponse)
+async def assign_property_owner(
+    property_id: int,
+    owner_id: int,
+    current_user: User = Depends(get_current_manager)
+):
+    """分配房产给业主"""
+    property_obj = await Property.get_or_none(id=property_id)
+    if not property_obj:
+        raise HTTPException(status_code=404, detail="房产不存在")
+    
+    owner = await User.get_or_none(id=owner_id, role=UserRole.OWNER)
+    if not owner:
+        raise HTTPException(status_code=404, detail="业主不存在")
+    
+    property_obj.owner_id = owner_id
+    await property_obj.save()
+    return MessageResponse(message="房产已分配给业主")
+
+
+@router.delete("/properties/{property_id}/owner", response_model=MessageResponse)
+async def unbind_property_owner(
+    property_id: int,
+    current_user: User = Depends(get_current_manager)
+):
+    """解绑房产业主"""
+    property_obj = await Property.get_or_none(id=property_id)
+    if not property_obj:
+        raise HTTPException(status_code=404, detail="房产不存在")
+    
+    property_obj.owner_id = None
+    await property_obj.save()
+    return MessageResponse(message="房产已解绑业主")
 
 
 # ============= 账单管理 =============
@@ -298,21 +386,27 @@ async def create_bill(
 
 @router.post("/bills/batch")
 async def create_bills_batch(
-    fee_type: str,
-    billing_period: str,
-    due_date: date,
+    request: BillBatchCreateRequest,
     current_user: User = Depends(get_current_manager)
 ):
-    """批量生成账单"""
+    """批量生成账单（按收费标准）"""
     # 获取收费标准
-    standard = await FeeStandard.get_or_none(fee_type=fee_type, is_active=True)
+    standard = await FeeStandard.get_or_none(fee_type=request.fee_type, is_active=True)
     if not standard:
         raise HTTPException(status_code=404, detail="收费标准不存在")
     
-    # 获取所有有业主的房产
-    properties = await Property.filter(owner_id__not_isnull=True).prefetch_related("owner")
+    # 构建查询
+    query = Property.filter(owner_id__not_isnull=True)
+    
+    # 如果指定了业主，只为这些业主生成
+    if request.owner_ids:
+        query = query.filter(owner_id__in=request.owner_ids)
+    
+    properties = await query.prefetch_related("owner")
     
     created_count = 0
+    skipped_count = 0
+    
     for property_obj in properties:
         # 计算金额（根据面积）
         amount = property_obj.area * standard.unit_price
@@ -321,22 +415,88 @@ async def create_bills_batch(
         existing_bill = await Bill.get_or_none(
             owner_id=property_obj.owner_id,
             property_id=property_obj.id,
-            fee_type=fee_type,
-            billing_period=billing_period
+            fee_type=request.fee_type,
+            billing_period=request.billing_period
         )
         
         if not existing_bill:
             await Bill.create(
                 owner_id=property_obj.owner_id,
                 property_id=property_obj.id,
-                fee_type=fee_type,
+                fee_type=request.fee_type,
                 amount=amount,
-                billing_period=billing_period,
-                due_date=due_date
+                billing_period=request.billing_period,
+                due_date=request.due_date
             )
             created_count += 1
+        else:
+            skipped_count += 1
     
-    return {"message": f"成功生成 {created_count} 条账单"}
+    return {
+        "message": f"成功生成 {created_count} 条账单",
+        "created": created_count,
+        "skipped": skipped_count,
+        "total": created_count + skipped_count
+    }
+
+
+@router.post("/bills/batch-by-owner")
+async def create_bills_for_owner(
+    request: BillBatchCreateByOwnerRequest,
+    current_user: User = Depends(get_current_manager)
+):
+    """为指定业主批量创建账单（可自定义金额）"""
+    # 验证业主存在
+    owner = await User.get_or_none(id=request.owner_id, role=UserRole.OWNER)
+    if not owner:
+        raise HTTPException(status_code=404, detail="业主不存在")
+    
+    created_count = 0
+    errors = []
+    
+    for bill_data in request.bills:
+        # 验证房产存在且属于该业主
+        property_obj = await Property.get_or_none(
+            id=bill_data.property_id, 
+            owner_id=request.owner_id
+        )
+        if not property_obj:
+            errors.append(f"房产ID {bill_data.property_id} 不存在或不属于该业主")
+            continue
+        
+        # 检查是否已存在
+        existing_bill = await Bill.get_or_none(
+            owner_id=request.owner_id,
+            property_id=bill_data.property_id,
+            fee_type=bill_data.fee_type,
+            billing_period=bill_data.billing_period
+        )
+        
+        if existing_bill:
+            errors.append(f"房产ID {bill_data.property_id} 的 {bill_data.fee_type} 账单已存在")
+            continue
+        
+        # 创建账单
+        await Bill.create(
+            owner_id=request.owner_id,
+            property_id=bill_data.property_id,
+            fee_type=bill_data.fee_type,
+            amount=bill_data.amount,
+            billing_period=bill_data.billing_period,
+            due_date=bill_data.due_date
+        )
+        created_count += 1
+    
+    result = {
+        "message": f"成功创建 {created_count} 条账单",
+        "created": created_count,
+        "total": len(request.bills)
+    }
+    
+    if errors:
+        result["errors"] = errors
+    
+    return result
 
 
 @router.get("/bills", response_model=List[BillWithDetails])
@@ -376,6 +536,63 @@ async def get_all_bills(
         })
     
     return result
+
+
+@router.put("/bills/{bill_id}", response_model=BillResponse)
+async def update_bill(
+    bill_id: int,
+    amount: Decimal = None,
+    billing_period: str = None,
+    due_date: date = None,
+    current_user: User = Depends(get_current_manager)
+):
+    """修改账单（仅允许修改未支付的账单）"""
+    bill = await Bill.get_or_none(id=bill_id)
+    if not bill:
+        raise HTTPException(status_code=404, detail="账单不存在")
+    
+    if bill.status != BillStatus.UNPAID:
+        raise HTTPException(status_code=400, detail="只能修改未支付的账单")
+    
+    if amount is not None:
+        bill.amount = amount
+    if billing_period is not None:
+        bill.billing_period = billing_period
+    if due_date is not None:
+        bill.due_date = due_date
+    
+    await bill.save()
+    
+    return BillResponse(
+        id=bill.id,
+        owner_id=bill.owner_id,
+        property_id=bill.property_id,
+        fee_type=bill.fee_type.value,
+        amount=bill.amount,
+        billing_period=bill.billing_period,
+        due_date=bill.due_date,
+        status=bill.status.value,
+        paid_at=bill.paid_at,
+        invoice_url=bill.invoice_url,
+        created_at=bill.created_at
+    )
+
+
+@router.delete("/bills/{bill_id}", response_model=MessageResponse)
+async def delete_bill(
+    bill_id: int,
+    current_user: User = Depends(get_current_manager)
+):
+    """删除账单（仅允许删除未支付的账单）"""
+    bill = await Bill.get_or_none(id=bill_id)
+    if not bill:
+        raise HTTPException(status_code=404, detail="账单不存在")
+    
+    if bill.status != BillStatus.UNPAID:
+        raise HTTPException(status_code=400, detail="只能删除未支付的账单")
+    
+    await bill.delete()
+    return MessageResponse(message="账单已删除")
 
 
 # ============= 报修管理 =============
@@ -491,7 +708,7 @@ async def get_maintenance_workers(
 
 @router.post("/maintenance-workers", response_model=UserResponse)
 async def create_maintenance_worker(
-    worker_data: UserCreate,
+    worker_data: MaintenanceCreate,
     current_user: User = Depends(get_current_manager)
 ):
     """创建维修人员"""
@@ -514,7 +731,7 @@ async def create_maintenance_worker(
 @router.put("/maintenance-workers/{worker_id}", response_model=UserResponse)
 async def update_maintenance_worker(
     worker_id: int,
-    worker_data: UserCreate,
+    worker_data: MaintenanceUpdate,
     current_user: User = Depends(get_current_manager)
 ):
     """更新维修人员信息"""
@@ -533,18 +750,35 @@ async def update_maintenance_worker(
 
 
 @router.delete("/maintenance-workers/{worker_id}", response_model=MessageResponse)
-async def deactivate_maintenance_worker(
+async def delete_maintenance_worker(
     worker_id: int,
+    force: bool = False,
     current_user: User = Depends(get_current_manager)
 ):
-    """停用维修人员"""
+    """删除维修人员"""
     worker = await User.get_or_none(id=worker_id, role=UserRole.MAINTENANCE)
     if not worker:
         raise HTTPException(status_code=404, detail="维修人员不存在")
     
-    worker.is_active = False
-    await worker.save()
-    return MessageResponse(message="维修人员已停用")
+    # 检查是否有关联的维修工单
+    repair_count = await RepairOrder.filter(maintenance_worker_id=worker_id).count()
+    
+    if repair_count > 0 and not force:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"该维修人员有 {repair_count} 个关联的维修工单"
+        )
+    
+    # 如果强制删除，解绑所有关联工单
+    if force and repair_count > 0:
+        await RepairOrder.filter(maintenance_worker_id=worker_id).update(
+            maintenance_worker_id=None,
+            status=RepairStatus.PENDING  # 重置为待分配状态
+        )
+    
+    # 真删除
+    await worker.delete()
+    return MessageResponse(message="维修人员已删除")
 
 
 # ============= 公告管理 =============

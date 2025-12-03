@@ -14,16 +14,16 @@ if errorlevel 1 (
 
 REM 检查是否安装了依赖
 echo 检查依赖...
-pip show fastapi >nul 2>&1
-if errorlevel 1 (
-    echo 正在安装依赖包...
-    pip install -r requirements.txt
-    if errorlevel 1 (
-        echo [错误] 依赖安装失败
-        pause
-        exit /b 1
-    )
-)
+::pip show fastapi >nul 2>&1
+::if errorlevel 1 (
+::    echo 正在安装依赖包...
+    ::pip install -r requirements.txt
+::    if errorlevel 1 (
+::        echo [错误] 依赖安装失败
+::        pause
+::        exit /b 1
+ ::   )
+::)
 
 REM 检查.env文件
 if not exist .env (
@@ -38,6 +38,6 @@ echo API文档: http://localhost:8088/docs
 echo ================================
 echo.
 
-uvicorn main:app --reload --host 127.0.0. --port 8088
+uvicorn main:app --reload --host 127.0.0.1 --port 8088
 
 pause
