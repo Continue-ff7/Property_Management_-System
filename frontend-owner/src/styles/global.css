@@ -1,0 +1,47 @@
+/* 全局样式 - 移动端适配 */
+
+/* PC端：限制fixed组件在容器内 */
+@media (min-width: 481px) {
+  /* NavBar固定定位调整 */
+  .van-nav-bar--fixed {
+    position: fixed;
+    max-width: 480px;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%);
+  }
+  
+  /* Tabbar固定定位调整 */
+  .van-tabbar {
+    position: fixed !important;
+    max-width: 480px !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+    width: 100% !important;
+  }
+  
+  /* Popup、ActionSheet等弹出层 */
+  .van-popup,
+  .van-action-sheet {
+    max-width: 480px;
+    left: 50% !important;
+    transform: translateX(-50%);
+  }
+  
+  /* Toast、Dialog等全局提示 - 保持在容器中心 */
+  .van-toast,
+  .van-dialog {
+    left: 50% !important;
+  }
+}
+
+/* 手机端：保持默认样式 */
+@media (max-width: 480px) {
+  .van-nav-bar--fixed,
+  .van-tabbar {
+    left: 0 !important;
+    transform: none !important;
+    max-width: 100% !important;
+  }
+}
