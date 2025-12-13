@@ -113,7 +113,7 @@
             <div class="name">{{ repair.maintenance_worker_name }}</div>
             <div class="phone">{{ repair.owner_phone || '暂无电话' }}</div>
           </div>
-          <van-button type="primary" size="small" icon="chat-o" @click="showChatDialog = true">
+          <van-button type="primary" size="small" icon="chat-o" @click="goToChat">
             对话
           </van-button>
         </div>
@@ -138,7 +138,13 @@
     </div>
     
     <!-- 评价弹窗 -->
-    <van-popup v-model="showEvalDialog" position="bottom" round :style="{ height: '60%' }">
+    <van-popup 
+      :show="showEvalDialog" 
+      @update:show="showEvalDialog = $event"
+      position="bottom" 
+      round 
+      :style="{ height: '60%' }"
+    >
       <div class="eval-content">
         <h3>评价维修服务</h3>
         
@@ -166,7 +172,13 @@
     </van-popup>
     
     <!-- 对话弹窗（预留） -->
-    <van-popup v-model="showChatDialog" position="bottom" round :style="{ height: '70%' }">
+    <van-popup 
+      :show="showChatDialog" 
+      @update:show="showChatDialog = $event"
+      position="bottom" 
+      round 
+      :style="{ height: '70%' }"
+    >
       <div class="chat-content">
         <h3>与维修人员对话</h3>
         <van-empty description="对话功能开发中..." />
@@ -248,6 +260,10 @@ export default {
       })
     }
     
+    const goToChat = () => {
+      router.push(`/repair/${repair.value.id}/chat`)
+    }
+    
     const getStatusType = (status) => {
       const map = {
         pending: 'default',
@@ -304,6 +320,7 @@ export default {
       getProgressStep,
       submitEval,
       previewImages,
+      goToChat,
       getStatusType,
       getStatusText,
       getUrgencyType,

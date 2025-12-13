@@ -52,10 +52,48 @@ const routes = [
     meta: { title: '维修详情' }
   },
   {
+    path: '/repair/:id/chat',
+    name: 'RepairChat',
+    component: () => import('@/views/RepairChat.vue'),
+    meta: { title: '聊天' }
+  },
+  {
     path: '/announcements',
     name: 'Announcements',
     component: () => import('@/views/Announcements.vue'),
     meta: { title: '公告通知' }
+  },
+  // 维修人员端路由
+  {
+    path: '/maintenance/workorders',
+    name: 'MaintenanceWorkorders',
+    component: () => import('@/views/maintenance/Workorders.vue'),
+    meta: { title: '我的工单', requiresAuth: true, role: 'maintenance' }
+  },
+  {
+    path: '/maintenance/workorder/:id',
+    name: 'MaintenanceWorkorderDetail',
+    component: () => import('@/views/maintenance/WorkorderDetail.vue'),
+    meta: { title: '工单详情', requiresAuth: true, role: 'maintenance' }
+  },
+  {
+    path: '/maintenance/workorder/:id/complete',
+    name: 'CompleteWorkorder',
+    component: () => import('@/views/maintenance/CompleteWorkorder.vue'),
+    meta: { title: '完成维修', requiresAuth: true, role: 'maintenance' }
+  },
+  {
+    path: '/maintenance/profile',
+    name: 'MaintenanceProfile',
+    component: () => import('@/views/maintenance/Profile.vue'),
+    meta: { title: '个人中心', requiresAuth: true, role: 'maintenance' }
+  },
+  // 维修人员端聊天
+  {
+    path: '/maintenance/workorder/:id/chat',
+    name: 'MaintenanceChat',
+    component: () => import('@/views/RepairChat.vue'),
+    meta: { title: '聊天', requiresAuth: true, role: 'maintenance' }
   }
 ]
 

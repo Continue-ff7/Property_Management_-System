@@ -11,7 +11,7 @@
       <van-form @submit="onSubmit">
         <van-cell-group inset>
           <van-field
-            v-model="form.property_id"
+            :model-value="selectedProperty ? `${selectedProperty.building_name} ${selectedProperty.unit}单元 ${selectedProperty.room_number}` : ''"
             is-link
             readonly
             label="报修地址"
@@ -60,7 +60,11 @@
     </div>
     
     <!-- 房产选择器 -->
-    <van-popup v-model="showPropertyPicker" position="bottom">
+    <van-popup 
+      :show="showPropertyPicker" 
+      @update:show="showPropertyPicker = $event"
+      position="bottom"
+    >
       <van-picker
         :columns="propertyColumns"
         @confirm="onPropertyConfirm"
@@ -69,7 +73,11 @@
     </van-popup>
     
     <!-- 紧急程度选择器 -->
-    <van-popup v-model="showUrgencyPicker" position="bottom">
+    <van-popup 
+      :show="showUrgencyPicker" 
+      @update:show="showUrgencyPicker = $event"
+      position="bottom"
+    >
       <van-picker
         :columns="urgencyColumns"
         @confirm="onUrgencyConfirm"
@@ -96,6 +104,7 @@ export default {
       images: []
     })
     
+    const selectedProperty = ref(null)
     const properties = ref([])
     const fileList = ref([])
     const submitting = ref(false)
@@ -126,6 +135,7 @@ export default {
         properties.value = data
         if (data.length > 0) {
           form.value.property_id = data[0].id
+          selectedProperty.value = data[0]
         }
       } catch (error) {
         console.error('加载房产失败:', error)
@@ -133,7 +143,11 @@ export default {
     }
     
     const onPropertyConfirm = ({ selectedOptions }) => {
-      form.value.property_id = selectedOptions[0].value
+      const property = properties.value.find(p => p.id === selectedOptions[0].value)
+      if (property) {
+        form.value.property_id = property.id
+        selectedProperty.value = property
+      }
       showPropertyPicker.value = false
     }
     
@@ -190,6 +204,7 @@ export default {
       form,
       fileList,
       submitting,
+      selectedProperty,
       showPropertyPicker,
       showUrgencyPicker,
       propertyColumns,

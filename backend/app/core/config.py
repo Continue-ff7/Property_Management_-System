@@ -12,7 +12,14 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7天
     
     # CORS配置
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:8080", "http://localhost:3000", "http://127.0.0.1:8080"]
+    ALLOWED_ORIGINS: List[str] = [
+        "http://localhost:5173", 
+        "http://localhost:8080", 
+        "http://localhost:8081",
+        "http://localhost:3000", 
+        "http://127.0.0.1:8080",
+        "http://127.0.0.1:8081"
+    ]
     
     # 文件上传配置
     UPLOAD_DIR: str = "uploads"

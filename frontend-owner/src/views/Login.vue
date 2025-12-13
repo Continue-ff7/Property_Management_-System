@@ -2,7 +2,25 @@
   <div class="login-page">
     <div class="header">
       <h1>智慧物业</h1>
-      <p>业主服务系统</p>
+      <p>移动服务系统</p>
+    </div>
+    
+    <!-- 角色选择 -->
+    <div class="role-selector">
+      <van-button 
+        :type="loginRole === 'owner' ? 'primary' : 'default'"
+        @click="loginRole = 'owner'"
+        round
+      >
+        业主端
+      </van-button>
+      <van-button 
+        :type="loginRole === 'maintenance' ? 'primary' : 'default'"
+        @click="loginRole = 'maintenance'"
+        round
+      >
+        维修人员
+      </van-button>
     </div>
     
     <van-form @submit="onSubmit" class="login-form">
@@ -46,6 +64,7 @@ export default {
     const router = useRouter()
     const store = useStore()
     const loading = ref(false)
+    const loginRole = ref('owner') // 默认业主
     
     const formData = reactive({
       username: '',
@@ -60,14 +79,30 @@ export default {
           password: formData.password
         })
         
+        // 检查角色是否匹配
+        if (loginRole.value === 'owner' && res.user.role !== 'owner') {
+          showToast('请使用业主账号登录')
+          return
+        }
+        if (loginRole.value === 'maintenance' && res.user.role !== 'maintenance') {
+          showToast('请使用维修人员账号登录')
+          return
+        }
+        
         // 保存token和用户信息
         await store.dispatch('login', {
           token: res.access_token,
-          userInfo: res.user_info || { username: formData.username }
+          userInfo: res.user || { username: formData.username, role: res.user.role }
         })
         
         showToast('登录成功')
-        router.push('/')
+        
+        // 根据角色跳转
+        if (loginRole.value === 'maintenance') {
+          router.push('/maintenance/workorders')
+        } else {
+          router.push('/')
+        }
       } catch (error) {
         console.error('登录失败:', error)
       } finally {
@@ -78,6 +113,7 @@ export default {
     return {
       formData,
       loading,
+      loginRole,
       onSubmit
     }
   }
@@ -106,6 +142,20 @@ export default {
 .header p {
   font-size: 16px;
   opacity: 0.9;
+}
+
+.role-selector {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 30px;
+  padding: 0 16px;
+}
+
+.role-selector .van-button {
+  flex: 1;
+  height: 44px;
+  font-size: 15px;
 }
 
 .login-form {

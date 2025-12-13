@@ -106,8 +106,9 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useStore } from 'vuex'
 import { showToast, showSuccessToast, showImagePreview } from 'vant'
 import { repairAPI } from '@/api'
 import { getImageUrl } from '@/utils/request'
@@ -116,6 +117,7 @@ export default {
   name: 'Repairs',
   setup() {
     const router = useRouter()
+    const store = useStore()
     const repairs = ref([])
     const loading = ref(false)
     const finished = ref(false)
@@ -231,6 +233,21 @@ export default {
     const goToDetail = (repairId) => {
       router.push(`/repair/${repairId}`)
     }
+    
+    onMounted(() => {
+      loadRepairs()
+    })
+    
+    // 监听Vuex中的工单状态更新通知
+    watch(
+      () => store.state.repairStatusUpdate,
+      (newVal) => {
+        if (newVal) {
+          // 收到工单状态更新，刷新列表
+          loadRepairs()
+        }
+      }
+    )
     
     return {
       repairs,

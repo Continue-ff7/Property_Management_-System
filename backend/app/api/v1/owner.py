@@ -193,6 +193,23 @@ async def create_repair_order(
     
     property_info = f"{order.property.building.name}{order.property.unit}单元{order.property.room_number}"
     
+    # 通过WebSocket通知管理员
+    from app.api.v1.websocket import notify_new_repair
+    await notify_new_repair({
+        "id": order.id,
+        "order_number": order.order_number,
+        "owner_id": order.owner_id,
+        "owner_name": current_user.name,
+        "owner_phone": current_user.phone,
+        "property_id": order.property_id,
+        "property_info": property_info,
+        "description": order.description,
+        "images": order.images or [],
+        "urgency_level": order.urgency_level.value,
+        "status": order.status.value,
+        "created_at": order.created_at.isoformat()
+    })
+    
     return {
         "id": order.id,
         "order_number": order.order_number,

@@ -10,7 +10,7 @@
           src="https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg"
         />
         <div class="info">
-          <div class="name">{{ userInfo.name || '业主' }}</div>
+          <div class="name">{{ userInfo.name || userInfo.username || '业主' }}</div>
           <div class="property">{{ propertyInfo }}</div>
         </div>
       </div>
@@ -100,7 +100,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 import { ownerAPI, billAPI, repairAPI, announcementAPI } from '@/api'
@@ -179,6 +179,17 @@ export default {
     onMounted(() => {
       loadData()
     })
+    
+    // 监听Vuex中的工单状态更新通知
+    watch(
+      () => store.state.repairStatusUpdate,
+      (newVal) => {
+        if (newVal) {
+          // 收到工单状态更新，刷新待办事项
+          loadData()
+        }
+      }
+    )
     
     return {
       userInfo,

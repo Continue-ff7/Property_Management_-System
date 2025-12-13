@@ -32,12 +32,21 @@ service.interceptors.response.use(
     console.error('响应错误:', error)
     
     if (error.response) {
+      const errorMsg = error.response.data.detail || '请求失败'
+      
       switch (error.response.status) {
         case 401:
-          ElMessage.error('登录已过期,请重新登录')
-          localStorage.removeItem('token')
-          localStorage.removeItem('userInfo')
-          router.push('/login')
+          // 区分登录失败和 token 过期
+          if (errorMsg.includes('用户名') || errorMsg.includes('密码')) {
+            // 登录失败，不清除token
+            ElMessage.error(errorMsg)
+          } else {
+            // token过期
+            ElMessage.error('登录已过期,请重新登录')
+            localStorage.removeItem('token')
+            localStorage.removeItem('userInfo')
+            router.push('/login')
+          }
           break
         case 403:
           ElMessage.error('没有权限访问')
@@ -49,7 +58,7 @@ service.interceptors.response.use(
           ElMessage.error('服务器错误')
           break
         default:
-          ElMessage.error(error.response.data.detail || '请求失败')
+          ElMessage.error(errorMsg)
       }
     } else {
       ElMessage.error('网络错误，请检查网络连接')

@@ -31,8 +31,13 @@ async def get_my_orders(
     """查看分配给自己的维修工单"""
     query = RepairOrder.filter(maintenance_worker_id=current_user.id)
     
-    if status:
-        query = query.filter(status=status)
+    if status and status != 'all':
+        if status == 'assigned':
+            query = query.filter(status=RepairStatus.ASSIGNED)
+        elif status == 'in_progress':
+            query = query.filter(status=RepairStatus.IN_PROGRESS)
+        elif status == 'completed':
+            query = query.filter(status=RepairStatus.COMPLETED)
     
     orders = await query.order_by("-created_at").offset(skip).limit(limit).prefetch_related(
         "owner", "property", "property__building"
@@ -48,21 +53,22 @@ async def get_my_orders(
             "owner_id": order.owner_id,
             "property_id": order.property_id,
             "description": order.description,
-            "images": order.images,
+            "images": order.images or [],
             "urgency_level": order.urgency_level.value,
             "status": order.status.value,
             "maintenance_worker_id": order.maintenance_worker_id,
             "assigned_at": order.assigned_at,
             "started_at": order.started_at,
             "completed_at": order.completed_at,
-            "repair_images": order.repair_images,
+            "repair_images": order.repair_images or [],
             "rating": order.rating,
             "comment": order.comment,
             "created_at": order.created_at,
             "owner_name": order.owner.name,
             "owner_phone": order.owner.phone,
             "property_info": property_info,
-            "maintenance_worker_name": current_user.name
+            "maintenance_worker_name": current_user.name,
+            "area": order.property.area
         })
     
     return result
@@ -117,7 +123,7 @@ async def start_repair(
     order = await RepairOrder.get_or_none(
         id=order_id, 
         maintenance_worker_id=current_user.id
-    )
+    ).prefetch_related("owner", "property", "property__building")
     
     if not order:
         raise HTTPException(status_code=404, detail="工单不存在或不属于您")
@@ -128,6 +134,19 @@ async def start_repair(
     order.status = RepairStatus.IN_PROGRESS
     order.started_at = datetime.now()
     await order.save()
+    
+    # 通过WebSocket通知业主
+    from app.api.v1.websocket import notify_repair_status_update
+    property_info = f"{order.property.building.name}{order.property.unit}单元{order.property.room_number}"
+    await notify_repair_status_update(order.owner_id, {
+        "id": order.id,
+        "order_number": order.order_number,
+        "status": order.status.value,
+        "started_at": order.started_at.isoformat(),
+        "property_info": property_info,
+        "maintenance_worker_name": current_user.name,
+        "message": "维修人员已开始维修"
+    })
     
     return MessageResponse(message="已开始维修")
 
@@ -141,7 +160,7 @@ async def complete_repair(
     order = await RepairOrder.get_or_none(
         id=order_id, 
         maintenance_worker_id=current_user.id
-    )
+    ).prefetch_related("owner", "property", "property__building")
     
     if not order:
         raise HTTPException(status_code=404, detail="工单不存在或不属于您")
@@ -152,6 +171,19 @@ async def complete_repair(
     order.status = RepairStatus.COMPLETED
     order.completed_at = datetime.now()
     await order.save()
+    
+    # 通过WebSocket通知业主
+    from app.api.v1.websocket import notify_repair_status_update
+    property_info = f"{order.property.building.name}{order.property.unit}单元{order.property.room_number}"
+    await notify_repair_status_update(order.owner_id, {
+        "id": order.id,
+        "order_number": order.order_number,
+        "status": order.status.value,
+        "completed_at": order.completed_at.isoformat(),
+        "property_info": property_info,
+        "maintenance_worker_name": current_user.name,
+        "message": "维修已完成，请进行评价"
+    })
     
     return MessageResponse(message="维修已完成")
 

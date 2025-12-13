@@ -52,6 +52,13 @@
             >
               分配
             </el-button>
+            <el-button
+              size="small"
+              type="danger"
+              @click="handleDelete(row)"
+            >
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -123,13 +130,15 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, reactive, onMounted, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { repairAPI, maintenanceAPI } from '@/api'
+import { useStore } from 'vuex'
 
 export default {
   name: 'Repairs',
   setup() {
+    const store = useStore()
     const loading = ref(false)
     const filterStatus = ref('')
     const filterUrgency = ref('')
@@ -206,8 +215,34 @@ export default {
       detailDialogVisible.value = true
     }
     
+    const handleDelete = async (row) => {
+      try {
+        await ElMessageBox.confirm(
+          `确定要删除工单 ${row.order_number} 吗？删除后业主将收到拒绝通知。`,
+          '警告',
+          {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning',
+          }
+        )
+        
+        await repairAPI.deleteRepair(row.id)
+        ElMessage.success('工单已删除')
+        loadRepairs()
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error('删除失败:', error)
+        }
+      }
+    }
+    
     const getImageUrl = (url) => {
-      return url.startsWith('http') ? url : `http://localhost:8000${url}`
+      if (!url) return ''
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url
+      }
+      return `http://localhost:8088${url}`
     }
     
     const getUrgencyType = (level) => {
@@ -235,10 +270,21 @@ export default {
       loadWorkers()
     })
     
+    // 监听Vuex中的新报修通知
+    watch(
+      () => store.state.newRepairNotification,
+      (newVal) => {
+        if (newVal) {
+          // 收到新报修通知，刷新列表
+          loadRepairs()
+        }
+      }
+    )
+    
     return {
       loading, filterStatus, filterUrgency, repairs, pagination, workers,
       assignDialogVisible, detailDialogVisible, currentRepair, assignWorkerId, assigning,
-      loadRepairs, handlePageChange, showAssignDialog, handleAssign, viewDetail,
+      loadRepairs, handlePageChange, showAssignDialog, handleAssign, handleDelete, viewDetail,
       getImageUrl, getUrgencyType, getUrgencyText, getStatusType, getStatusText
     }
   }

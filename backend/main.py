@@ -1,11 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from tortoise import Tortoise
 from app.core.config import settings
-from app.api.v1 import owner, property_manager, maintenance, auth, common
+from app.api.v1 import owner, property_manager, maintenance, auth, common, websocket, chat
 import os
+import time
 
 
 @asynccontextmanager
@@ -42,6 +43,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 添加请求日志中间件
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    print(f"\n[{request.method}] {request.url.path}")
+    
+    response = await call_next(request)
+    
+    process_time = time.time() - start_time
+    print(f"[{request.method}] {request.url.path} - {response.status_code} - {process_time:.2f}s")
+    
+    return response
+
 # 静态文件服务（用于图片和发票）
 if os.path.exists(settings.UPLOAD_DIR):
     app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
@@ -52,6 +66,10 @@ app.include_router(common.router, prefix="/api/v1/common", tags=["公共"])
 app.include_router(owner.router, prefix="/api/v1/owner", tags=["业主端"])
 app.include_router(property_manager.router, prefix="/api/v1/manager", tags=["物业管理端"])
 app.include_router(maintenance.router, prefix="/api/v1/maintenance", tags=["维修人员端"])
+
+# 注册WebSocket路由
+app.include_router(websocket.router, tags=["WebSocket"])
+app.include_router(chat.router, tags=["聊天"])
 
 
 @app.get("/")

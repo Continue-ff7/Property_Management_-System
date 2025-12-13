@@ -4,12 +4,13 @@ export default createStore({
   state: {
     token: localStorage.getItem('token') || '',
     userInfo: JSON.parse(localStorage.getItem('userInfo') || '{}'),
-    sidebarCollapsed: false
+    sidebarCollapsed: false,
+    newRepairNotification: null  // 新报修通知
   },
   
   getters: {
     isLoggedIn: state => !!state.token,
-    userName: state => state.userInfo.name || '',
+    userName: state => state.userInfo.name || state.userInfo.username || '系统管理员',
     userRole: state => state.userInfo.role || ''
   },
   
@@ -33,6 +34,10 @@ export default createStore({
     
     TOGGLE_SIDEBAR(state) {
       state.sidebarCollapsed = !state.sidebarCollapsed
+    },
+    
+    SET_NEW_REPAIR_NOTIFICATION(state, data) {
+      state.newRepairNotification = data
     }
   },
   
@@ -44,6 +49,10 @@ export default createStore({
     
     logout({ commit }) {
       commit('CLEAR_AUTH')
+    },
+    
+    notifyNewRepair({ commit }, repairData) {
+      commit('SET_NEW_REPAIR_NOTIFICATION', repairData)
     }
   }
 })

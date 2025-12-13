@@ -5,6 +5,12 @@ import store from '@/store'
 // 获取后端服务器地址
 export const API_BASE_URL = process.env.VUE_APP_API_BASE_URL || 'http://localhost:8088'
 
+// 获取WebSocket地址
+export const getWebSocketUrl = (path) => {
+  const wsUrl = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://')
+  return `${wsUrl}${path}`
+}
+
 // 处理图片URL
 export const getImageUrl = (url) => {
   if (!url) return ''
@@ -44,12 +50,19 @@ request.interceptors.response.use(
     if (error.response) {
       const { status, data } = error.response
       if (status === 401) {
-        showToast('登录已过期，请重新登录')
-        store.commit('CLEAR_TOKEN')
-        // 跳转到登录页
-        setTimeout(() => {
-          window.location.href = '/login'
-        }, 1500)
+        // 分别处理登录失败和 token 过期
+        const errorMsg = data.detail || '认证失败'
+        if (errorMsg.includes('用户名') || errorMsg.includes('密码')) {
+          // 登录失败，不跳转，只显示错误
+          showToast(errorMsg)
+        } else {
+          // token过期，清空并跳转
+          showToast('登录已过期，请重新登录')
+          store.commit('CLEAR_TOKEN')
+          setTimeout(() => {
+            window.location.href = '/login'
+          }, 1500)
+        }
       } else {
         showToast(data.detail || '请求失败')
       }

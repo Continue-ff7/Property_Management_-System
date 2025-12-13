@@ -654,7 +654,9 @@ async def assign_repair_order(
     current_user: User = Depends(get_current_manager)
 ):
     """分配维修工单"""
-    order = await RepairOrder.get_or_none(id=order_id)
+    order = await RepairOrder.get_or_none(id=order_id).prefetch_related(
+        "owner", "property", "property__building"
+    )
     if not order:
         raise HTTPException(status_code=404, detail="工单不存在")
     
@@ -668,7 +670,83 @@ async def assign_repair_order(
     order.assigned_at = datetime.now()
     await order.save()
     
+    # 通过WebSocket通知维修人员
+    from app.api.v1.websocket import notify_new_workorder, notify_repair_status_update
+    property_info = f"{order.property.building.name}{order.property.unit}单元{order.property.room_number}"
+    await notify_new_workorder(maintenance_worker_id, {
+        "id": order.id,
+        "order_number": order.order_number,
+        "owner_id": order.owner_id,
+        "property_id": order.property_id,
+        "description": order.description,
+        "images": order.images,
+        "urgency_level": order.urgency_level.value,
+        "status": order.status.value,
+        "maintenance_worker_id": order.maintenance_worker_id,
+        "assigned_at": order.assigned_at.isoformat() if order.assigned_at else None,
+        "created_at": order.created_at.isoformat(),
+        "owner_name": order.owner.name,
+        "owner_phone": order.owner.phone,
+        "property_info": property_info,
+        "maintenance_worker_name": worker.name
+    })
+    
+    # 通过WebSocket通知业主
+    await notify_repair_status_update(order.owner_id, {
+        "id": order.id,
+        "order_number": order.order_number,
+        "status": order.status.value,
+        "assigned_at": order.assigned_at.isoformat(),
+        "property_info": property_info,
+        "maintenance_worker_name": worker.name,
+        "message": f"工单已分配给{worker.name}"
+    })
+    
     return MessageResponse(message="工单已分配")
+
+
+@router.delete("/repairs/{order_id}", response_model=MessageResponse)
+async def delete_repair_order(
+    order_id: int,
+    current_user: User = Depends(get_current_manager)
+):
+    """删除/拒绝工单"""
+    order = await RepairOrder.get_or_none(id=order_id).prefetch_related(
+        "owner", "property", "property__building", "maintenance_worker"
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="工单不存在")
+    
+    property_info = f"{order.property.building.name}{order.property.unit}单元{order.property.room_number}"
+    order_number = order.order_number
+    owner_id = order.owner_id
+    maintenance_worker_id = order.maintenance_worker_id
+    
+    # 删除工单
+    await order.delete()
+    
+    # 通过WebSocket通知业主（工单被拒绝）
+    from app.api.v1.websocket import notify_repair_status_update, notify_repair_deleted
+    await notify_repair_status_update(owner_id, {
+        "id": order_id,
+        "order_number": order_number,
+        "status": "rejected",
+        "property_info": property_info,
+        "message": "管理员已拒绝您的工单申请",
+        "deleted": True
+    })
+    
+    # 如果已分配给维修人员，通知维修人员（工单被撤销）
+    if maintenance_worker_id:
+        await notify_repair_deleted(maintenance_worker_id, {
+            "id": order_id,
+            "order_number": order_number,
+            "property_info": property_info,
+            "message": "管理员已撤销已分配的工单",
+            "deleted": True
+        })
+    
+    return MessageResponse(message="工单已删除")
 
 
 @router.put("/repairs/{order_id}", response_model=MessageResponse)

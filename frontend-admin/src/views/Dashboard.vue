@@ -84,10 +84,11 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 import * as echarts from 'echarts'
 import { statisticsAPI } from '@/api'
 import { User, Money, Tools, Warning } from '@element-plus/icons-vue'
+import { useStore } from 'vuex'
 
 export default {
   name: 'Dashboard',
@@ -95,6 +96,7 @@ export default {
     User, Money, Tools, Warning
   },
   setup() {
+    const store = useStore()
     const revenueChartRef = ref(null)
     const repairChartRef = ref(null)
     
@@ -261,6 +263,17 @@ export default {
     onMounted(() => {
       loadData()
     })
+    
+    // 监听Vuex中的新报修通知
+    watch(
+      () => store.state.newRepairNotification,
+      (newVal) => {
+        if (newVal) {
+          // 收到新报修通知，刷新统计数据
+          loadData()
+        }
+      }
+    )
     
     return {
       revenueChartRef,

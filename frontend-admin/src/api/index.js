@@ -188,6 +188,13 @@ export const repairAPI = {
       method: 'put',
       data
     })
+  },
+  // 删除工单
+  deleteRepair(id) {
+    return request({
+      url: `/manager/repairs/${id}`,
+      method: 'delete'
+    })
   }
 }
 

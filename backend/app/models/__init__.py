@@ -169,3 +169,17 @@ class ChatMessage(Model):
     
     class Meta:
         table = "chat_messages"
+
+
+class RepairChatMessage(Model):
+    """工单聊天记录"""
+    id = fields.IntField(pk=True)
+    repair_order = fields.ForeignKeyField("models.RepairOrder", related_name="chat_messages", description="工单")
+    sender = fields.ForeignKeyField("models.User", related_name="sent_messages", description="发送者")
+    message = fields.TextField(description="消息内容")
+    is_owner = fields.BooleanField(description="是否业主发送")
+    created_at = fields.DatetimeField(auto_now_add=True, description="发送时间")
+    
+    class Meta:
+        table = "repair_chat_messages"
+        ordering = ["created_at"]

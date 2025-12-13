@@ -105,3 +105,57 @@ export const uploadAPI = {
     })
   }
 }
+
+// 维修人员工单API
+export const maintenanceWorkorderAPI = {
+  // 获取我的工单
+  getMyWorkorders(params) {
+    return request({
+      url: '/maintenance/orders',
+      method: 'get',
+      params
+    })
+  },
+  // 获取工单详情
+  getWorkorderDetail(id) {
+    return request({
+      url: `/maintenance/orders/${id}`,
+      method: 'get'
+    })
+  },
+  // 开始维修
+  startWork(id) {
+    return request({
+      url: `/maintenance/orders/${id}/start`,
+      method: 'post'
+    })
+  },
+  // 完成维修
+  completeWork(id, data) {
+    return request({
+      url: `/maintenance/orders/${id}/complete`,
+      method: 'post',
+      data
+    })
+  },
+  // 上传维修图片
+  uploadRepairImage(id, file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return request({
+      url: `/maintenance/orders/${id}/upload-image`,
+      method: 'post',
+      data: formData,
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+  // 获取统计数据
+  getStatistics() {
+    return request({
+      url: '/maintenance/statistics',
+      method: 'get'
+    })
+  }
+}
