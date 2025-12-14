@@ -9,6 +9,7 @@ import { onMounted, onUnmounted } from 'vue'
 import { ElNotification } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useStore } from 'vuex'
+import { getWebSocketUrl } from '@/utils/request'
 
 export default {
   name: 'App',
@@ -31,7 +32,7 @@ export default {
         return
       }
       
-      ws = new WebSocket(`ws://192.168.64.24:8088/ws/manager?token=${token}`)
+      ws = new WebSocket(getWebSocketUrl(`/ws/manager?token=${token}`))
       
       ws.onopen = () => {
         console.log('管理员WebSocket连接成功')
