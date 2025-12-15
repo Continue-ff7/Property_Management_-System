@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from tortoise import Tortoise
 from app.core.config import settings
-from app.api.v1 import owner, property_manager, maintenance, auth, common, websocket, chat
+from app.api.v1 import owner, property_manager, maintenance, auth, common, websocket, chat, ai_assistant
 import os
 import time
 
@@ -70,6 +70,9 @@ app.include_router(maintenance.router, prefix="/api/v1/maintenance", tags=["维�
 # 注册WebSocket路由
 app.include_router(websocket.router, tags=["WebSocket"])
 app.include_router(chat.router, tags=["聊天"])
+
+# 注册AI助手路由
+app.include_router(ai_assistant.router, prefix="/api/v1", tags=["AI助手"])
 
 
 @app.get("/")

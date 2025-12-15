@@ -159,3 +159,36 @@ export const maintenanceWorkorderAPI = {
     })
   }
 }
+
+// AI助手API
+export const aiAssistantAPI = {
+  // 查询账单信息
+  getBills() {
+    return request({
+      url: '/ai/bills',
+      method: 'get'
+    })
+  },
+  // 查询报修记录
+  getRepairs() {
+    return request({
+      url: '/ai/repairs',
+      method: 'get'
+    })
+  },
+  // 查询房产信息
+  getProperties() {
+    return request({
+      url: '/ai/properties',
+      method: 'get'
+    })
+  },
+  // 创建报修工单
+  createRepair(data) {
+    return request({
+      url: '/ai/create-repair',
+      method: 'post',
+      data
+    })
+  }
+}

@@ -63,6 +63,12 @@ const routes = [
     component: () => import('@/views/Announcements.vue'),
     meta: { title: '公告通知' }
   },
+  {
+    path: '/ai-assistant',
+    name: 'AIAssistant',
+    component: () => import('@/views/AIAssistant.vue'),
+    meta: { title: 'AI助手' }
+  },
   // 维修人员端路由
   {
     path: '/maintenance/workorders',

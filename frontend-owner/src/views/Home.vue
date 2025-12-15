@@ -44,9 +44,9 @@
         <van-icon name="manager-o" size="28" color="#67c23a" />
         <span>文件下载</span>
       </div>
-      <div class="menu-item">
-        <van-icon name="friends-o" size="28" color="#ff6b6b" />
-        <span>人口管理</span>
+      <div class="menu-item" @click="goTo('/ai-assistant')">
+        <van-icon name="chat-o" size="28" color="#1989fa" />
+        <span>AI助手</span>
       </div>
       <div class="menu-item">
         <van-icon name="setting-o" size="28" color="#a0a0a0" />

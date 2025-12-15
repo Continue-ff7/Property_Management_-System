@@ -99,7 +99,7 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { showToast, showSuccessToast } from 'vant'
 import { billAPI } from '@/api'
 
@@ -120,13 +120,24 @@ export default {
     
     const loadBills = async () => {
       try {
+        loading.value = true
+        finished.value = false
+        bills.value = [] // 清空旧数据
+        
         const status = statusMap[activeTab.value]
         const params = status ? { status } : {}
+        console.log('加载账单, tab:', activeTab.value, 'status:', status, 'params:', params)
+        
         const data = await billAPI.getMyBills(params)
-        bills.value = data
+        console.log('账单数据:', data)
+        
+        bills.value = data || []
         finished.value = true
       } catch (error) {
         console.error('加载失败:', error)
+        showToast('加载账单失败')
+      } finally {
+        loading.value = false
       }
     }
     
@@ -195,6 +206,11 @@ export default {
       return map[status] || status
     }
     
+    // 初始化加载
+    onMounted(() => {
+      loadBills()
+    })
+    
     return {
       activeTab,
       bills,
@@ -204,6 +220,7 @@ export default {
       showPaySheet,
       payMethod,
       paying,
+      currentBill,
       loadBills,
       onLoad,
       onRefresh,
