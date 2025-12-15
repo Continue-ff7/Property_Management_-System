@@ -45,7 +45,7 @@ AI助手基于DeepSeek Function Calling实现，可以帮助业主完成以下�
 
 #### 3. API配置
 
-- API Key: `sk-0e8d3b59ce42403bb79c95c6f7888e88`
+- API Key: `xxxxxxxxxxxxxxxxx`
 - API URL: `https://api.deepseek.com/chat/completions`
 - Model: `deepseek-chat`
 

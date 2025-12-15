@@ -152,7 +152,7 @@ export default {
     ])
     
     // DeepSeek API配置
-    const DEEPSEEK_API_KEY = 'sk-0e8d3b59ce42403bb79c95c6f7888e88'
+    const DEEPSEEK_API_KEY = process.env.VUE_APP_DEEPSEEK_API_KEY
     const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions'
     
     // 定义可用的工具
