@@ -86,7 +86,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useStore } from 'vuex'
 import { showToast } from 'vant'
-import { getWebSocketUrl, API_BASE_URL } from '@/utils/request'
+import { getWebSocketUrl, API_BASE_URL, getImageUrl } from '@/utils/request'
 
 export default {
   name: 'RepairChat',
@@ -100,10 +100,11 @@ export default {
     const messages = ref([])
     const messageText = ref('')
     const chatContainer = ref(null)
+    // 头像：默认图片，后续从用户信息和工单中获取
     const myAvatar = ref('https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg')
     const otherAvatar = ref('https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg')
     const otherUserName = ref('')  // 对方用户名
-    const chatTitle = ref('与cc聊天')  // 聊天标题
+    const chatTitle = ref('聊天')  // 聊天标题
     const workorder = ref(null)  // 工单信息
     
     let ws = null
@@ -112,16 +113,42 @@ export default {
       router.back()
     }
     
-    // 获取工单信息
+    // 获取工单信息和头像
     const loadWorkorderInfo = async () => {
       try {
         const token = localStorage.getItem('token')
-        const isOwner = userInfo.value?.role === 'owner'
         
+        // 从 Vuex 获取用户信息，如果没有则从 localStorage 获取
+        let currentUserInfo = userInfo.value
+        if (!currentUserInfo || !currentUserInfo.role) {
+          const storedUserInfo = localStorage.getItem('userInfo')
+          if (storedUserInfo) {
+            currentUserInfo = JSON.parse(storedUserInfo)
+          }
+        }
+        
+        const isOwner = currentUserInfo?.role === 'owner'
+        
+        // 调试日志
+        console.log('=== loadWorkorderInfo 调试信息 ===')
+        console.log('Vuex userInfo:', userInfo.value)
+        console.log('localStorage userInfo:', localStorage.getItem('userInfo'))
+        console.log('最终使用的 userInfo:', currentUserInfo)
+        console.log('role:', currentUserInfo?.role)
+        console.log('isOwner:', isOwner)
+        console.log('repairId:', repairId)
+        
+        // 1. 设置自己的头像
+        if (currentUserInfo?.avatar) {
+          myAvatar.value = getImageUrl(currentUserInfo.avatar)
+        }
+        
+        // 2. 获取工单信息和对方头像
         let apiUrl
         if (isOwner) {
+          console.log('✅ 业主端：调用 /api/v1/owner/repairs')
           // 业主端：获取自己的工单
-          const response = await fetch(`http://localhost:8088/api/v1/owner/repairs`, {
+          const response = await fetch(`${API_BASE_URL}/api/v1/owner/repairs`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -129,23 +156,55 @@ export default {
           if (response.ok) {
             const repairs = await response.json()
             workorder.value = repairs.find(r => r.id === parseInt(repairId))
-            if (workorder.value && workorder.value.maintenance_worker_name) {
-              otherUserName.value = workorder.value.maintenance_worker_name
-              chatTitle.value = `与维修人员：${workorder.value.maintenance_worker_name}`
+            if (workorder.value) {
+              if (workorder.value.maintenance_worker_name) {
+                otherUserName.value = workorder.value.maintenance_worker_name
+                chatTitle.value = `与维修人员：${workorder.value.maintenance_worker_name}`
+              }
+              // 设置维修人员头像
+              if (workorder.value.maintenance_worker_avatar) {
+                otherAvatar.value = getImageUrl(workorder.value.maintenance_worker_avatar)
+                console.log('✅ 设置维修人员头像:', otherAvatar.value)
+              } else {
+                console.log('⚠️ 工单中没有 maintenance_worker_avatar 字段')
+              }
             }
           }
         } else {
+          console.log('✅ 维修人员端：调用 /api/v1/maintenance/orders/' + repairId)
           // 维修人员端：获取分配给自己的工单
-          const response = await fetch(`http://localhost:8088/api/v1/maintenance/orders/${repairId}`, {
+          const response = await fetch(`${API_BASE_URL}/api/v1/maintenance/orders/${repairId}`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
           })
+          
+          if (!response.ok) {
+            console.error(`❗ API 调用失败: ${response.status} ${response.statusText}`)
+            if (response.status === 403) {
+              console.error('⚠️ 403 Forbidden: 这个工单没有分配给当前维修人员')
+              showToast('您没有权限查看这个工单')
+            } else if (response.status === 404) {
+              console.error('⚠️ 404 Not Found: 工单不存在')
+              showToast('工单不存在')
+            }
+            return
+          }
+          
           if (response.ok) {
             workorder.value = await response.json()
-            if (workorder.value && workorder.value.owner_name) {
-              otherUserName.value = workorder.value.owner_name
-              chatTitle.value = `与业主：${workorder.value.owner_name}`
+            if (workorder.value) {
+              if (workorder.value.owner_name) {
+                otherUserName.value = workorder.value.owner_name
+                chatTitle.value = `与业主：${workorder.value.owner_name}`
+              }
+              // 设置业主头像
+              if (workorder.value.owner_avatar) {
+                otherAvatar.value = getImageUrl(workorder.value.owner_avatar)
+                console.log('✅ 设置业主头像:', otherAvatar.value)
+              } else {
+                console.log('⚠️ 工单中没有 owner_avatar 字段')
+              }
             }
           }
         }
@@ -158,7 +217,7 @@ export default {
     const loadChatHistory = async () => {
       try {
         const token = localStorage.getItem('token')
-        const response = await fetch(`${API_BASE_URL}/chat/history/${repairId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/v1/chat/history/${repairId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

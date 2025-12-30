@@ -60,8 +60,17 @@ request.interceptors.request.use(
 )
 
 // 响应拦截器
+let logoutTimer = null  // 存储1.5秒延迟跳转的定时器ID
+let isLoggingOut = false  // 标记是否正在执行登出流程
+
 request.interceptors.response.use(
   response => {
+    // 请求成功，取消之前的跳转定时器
+    if (logoutTimer) {
+      clearTimeout(logoutTimer)
+      logoutTimer = null
+      isLoggingOut = false
+    }
     return response.data
   },
   error => {
@@ -70,16 +79,28 @@ request.interceptors.response.use(
       if (status === 401) {
         // 分别处理登录失败和 token 过期
         const errorMsg = data.detail || '认证失败'
+        
         if (errorMsg.includes('用户名') || errorMsg.includes('密码')) {
           // 登录失败，不跳转，只显示错误
           showToast(errorMsg)
         } else {
-          // token过期，清空并跳转
-          showToast('登录已过期，请重新登录')
-          store.commit('CLEAR_TOKEN')
-          setTimeout(() => {
-            window.location.href = '/login'
-          }, 1500)
+          // token过期，准备跳转
+          // 如果已经在登出流程中，不重复处理
+          if (!isLoggingOut) {
+            isLoggingOut = true
+            showToast('登录已过期，请重新登录')
+            
+            // 取消之前的定时器
+            if (logoutTimer) {
+              clearTimeout(logoutTimer)
+            }
+            
+            // 设置新的定时器，在跳转前清空token
+            logoutTimer = setTimeout(() => {
+              store.commit('CLEAR_TOKEN')
+              window.location.href = '/login'
+            }, 1500)
+          }
         }
       } else {
         showToast(data.detail || '请求失败')

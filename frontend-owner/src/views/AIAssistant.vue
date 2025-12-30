@@ -161,7 +161,7 @@ export default {
         type: 'function',
         function: {
           name: 'get_bills',
-          description: '查询用户的账单信息，包括水费、电费、物业费等未缴费和已缴费账单',
+          description: '查询用户的账单信息，包括物业费、停车费、水费、电费等所有类型的未缴费和已缴费账单',
           parameters: {
             type: 'object',
             properties: {},
@@ -415,11 +415,8 @@ export default {
               if (toolCalls.length > 0) {
                 await handleToolCalls(toolCalls)
               } else if (streamingMessage.value) {
-                // 没有工具调用，直接显示AI回复
-                messages.value.push({
-                  type: 'ai',
-                  content: streamingMessage.value
-                })
+                // 没有工具调用，将流式消息添加到对话历史
+                // 不需要再添加到messages，因为流式显示时已经添加了
                 conversationHistory.value.push({
                   role: 'assistant',
                   content: streamingMessage.value

@@ -7,7 +7,7 @@
           round
           width="60"
           height="60"
-          src="https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg"
+          :src="getImageUrl(userInfo.avatar) || 'https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg'"
         />
         <div class="info">
           <div class="name">{{ userInfo.name || userInfo.username || '业主' }}</div>
@@ -40,9 +40,9 @@
         <van-icon name="add-o" size="28" color="#909399" />
         <span>报修申请</span>
       </div>
-      <div class="menu-item">
-        <van-icon name="manager-o" size="28" color="#67c23a" />
-        <span>文件下载</span>
+      <div class="menu-item" @click="goTo('/bills?tab=paid')">
+        <van-icon name="description" size="28" color="#67c23a" />
+        <span>发票下载</span>
       </div>
       <div class="menu-item" @click="goTo('/ai-assistant')">
         <van-icon name="chat-o" size="28" color="#1989fa" />
@@ -104,6 +104,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 import { ownerAPI, billAPI, repairAPI, announcementAPI } from '@/api'
+import { getImageUrl } from '@/utils/request'
 
 export default {
   name: 'Home',
@@ -196,6 +197,7 @@ export default {
       propertyInfo,
       todos,
       announcements,
+      getImageUrl,
       goTo,
       handleTodoClick
     }

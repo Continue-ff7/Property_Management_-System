@@ -2,8 +2,9 @@ from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File
 from app.core.dependencies import get_current_maintenance, save_upload_file
 from app.models import User, RepairOrder, RepairStatus
 from app.schemas import RepairOrderWithDetails, MessageResponse
-from typing import List
+from typing import List, Optional
 from datetime import datetime
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -17,7 +18,45 @@ async def get_profile(current_user: User = Depends(get_current_maintenance)):
         "name": current_user.name,
         "phone": current_user.phone,
         "email": current_user.email,
+        "avatar": current_user.avatar,  # 添加头像字段
         "created_at": current_user.created_at
+    }
+
+
+class UpdateProfileRequest(BaseModel):
+    """update profile request schema"""
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    avatar: Optional[str] = None  # 头像URL
+
+
+@router.put("/profile")
+async def update_profile(
+    update_data: UpdateProfileRequest,
+    current_user: User = Depends(get_current_maintenance)
+):
+    """更新个人信息"""
+    # 更新字段
+    if update_data.name is not None:
+        current_user.name = update_data.name
+    if update_data.phone is not None:
+        current_user.phone = update_data.phone
+    if update_data.email is not None:
+        current_user.email = update_data.email
+    if update_data.avatar is not None:
+        current_user.avatar = update_data.avatar
+    
+    await current_user.save()
+    
+    return {
+        "message": "更新成功",
+        "id": current_user.id,
+        "username": current_user.username,
+        "name": current_user.name,
+        "phone": current_user.phone,
+        "email": current_user.email,
+        "avatar": current_user.avatar
     }
 
 
@@ -66,8 +105,10 @@ async def get_my_orders(
             "created_at": order.created_at,
             "owner_name": order.owner.name,
             "owner_phone": order.owner.phone,
+            "owner_avatar": order.owner.avatar,  # 添加业主头像
             "property_info": property_info,
             "maintenance_worker_name": current_user.name,
+            "maintenance_worker_avatar": current_user.avatar,  # 添加维修人员头像
             "area": order.property.area
         })
     
@@ -109,8 +150,10 @@ async def get_order_detail(
         "created_at": order.created_at,
         "owner_name": order.owner.name,
         "owner_phone": order.owner.phone,
+        "owner_avatar": order.owner.avatar,  # 添加业主头像
         "property_info": property_info,
-        "maintenance_worker_name": current_user.name
+        "maintenance_worker_name": current_user.name,
+        "maintenance_worker_avatar": current_user.avatar  # 添加维修人员头像
     }
 
 

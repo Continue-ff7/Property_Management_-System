@@ -54,7 +54,7 @@
           <span>维修进度</span>
         </div>
         
-        <van-steps direction="vertical" :active="getProgressStep(repair.status)">
+        <van-steps direction="vertical" :active="getProgressStep(repair.status, repair.rating)">
           <van-step>
             <h3>已提交</h3>
             <p>{{ formatDate(repair.created_at) }}</p>
@@ -69,11 +69,6 @@
           </van-step>
           <van-step>
             <h3>{{ repair.status === 'in_progress' ? '维修中' : (repair.status === 'completed' ? '已完成' : '待维修') }}</h3>
-            <p v-if="repair.started_at">{{ formatDate(repair.started_at) }}</p>
-            <p class="desc" v-if="repair.status === 'in_progress'">维修人员正在处理中...</p>
-          </van-step>
-          <van-step>
-            <h3>{{ repair.status === 'completed' ? '已完成' : '待完成' }}</h3>
             <p v-if="repair.completed_at">{{ formatDate(repair.completed_at) }}</p>
             
             <!-- 维修完成图片 -->
@@ -91,6 +86,15 @@
                 />
               </div>
             </div>
+            <p class="desc" v-if="repair.status === 'completed' && !repair.rating">维修已完成，请评价服务质量</p>
+          </van-step>
+          <van-step>
+            <h3>{{ repair.rating ? '已评价' : '待评价' }}</h3>
+            <div v-if="repair.rating" class="rating-display">
+              <van-rate :model-value="repair.rating" :size="16" readonly />
+              <p class="desc" v-if="repair.comment">{{ repair.comment }}</p>
+            </div>
+            <p class="desc" v-else-if="repair.status !== 'completed'">维修完成后可进行评价</p>
           </van-step>
         </van-steps>
       </div>
@@ -107,7 +111,7 @@
             round
             width="50"
             height="50"
-            src="https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg"
+            :src="repair.maintenance_worker_avatar ? getImageUrl(repair.maintenance_worker_avatar) : 'https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg'"
           />
           <div class="worker-detail">
             <div class="name">{{ repair.maintenance_worker_name }}</div>
@@ -224,12 +228,18 @@ export default {
       }
     }
     
-    const getProgressStep = (status) => {
+    const getProgressStep = (status, rating) => {
+      // 如果已评价，显示第4步完成
+      if (rating) {
+        return 4
+      }
+      
+      // 根据工单状态返回进度
       const map = {
-        'pending': 0,
-        'assigned': 1,
-        'in_progress': 2,
-        'completed': 3
+        'pending': 0,      // 已提交
+        'assigned': 1,     // 已分配
+        'in_progress': 2,  // 维修中
+        'completed': 3     // 已完成（待评价）
       }
       return map[status] || 0
     }
@@ -295,9 +305,10 @@ export default {
     
     const getUrgencyText = (level) => {
       const map = {
-        low: '一般',
-        medium: '紧急',
-        high: '非常紧急'
+        low: '低',
+        medium: '中',
+        high: '高',
+        urgent: '紧急'
       }
       return map[level] || level
     }
@@ -465,5 +476,15 @@ export default {
   font-size: 12px;
   color: #969799;
   margin-top: 4px;
+}
+
+.rating-display {
+  margin-top: 8px;
+}
+
+.rating-display .desc {
+  margin-top: 8px;
+  color: #646566;
+  line-height: 1.5;
 }
 </style>

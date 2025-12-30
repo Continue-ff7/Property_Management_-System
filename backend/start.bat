@@ -38,6 +38,6 @@ echo API文档: http://localhost:8088/docs
 echo ================================
 echo.
 
-uvicorn main:app --reload --host 127.0.0.1 --port 8088
+uvicorn main:app --reload --host 0.0.0.0 --port 8088
 
 pause

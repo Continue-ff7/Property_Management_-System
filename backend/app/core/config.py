@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
     
+    # 后端服务地址配置（用于二维码验证URL）
+    BACKEND_HOST: str = "localhost:8088"
+    
     # AI客服配置（可选，后续集成）
     AI_SERVICE_URL: str = ""
     AI_SERVICE_KEY: str = ""

@@ -1,6 +1,11 @@
 <template>
   <div class="repairs-page">
-    <van-nav-bar title="我的报修" fixed>
+    <van-nav-bar 
+      title="我的报修" 
+      left-arrow
+      @click-left="$router.back()"
+      fixed
+    >
       <template #right>
         <van-button type="primary" size="small" @click="$router.push('/repair/create')">
           报修
@@ -219,9 +224,10 @@ export default {
     
     const getUrgencyText = (level) => {
       const map = {
-        low: '一般',
-        medium: '紧急',
-        high: '非常紧急'
+        low: '低',
+        medium: '中',
+        high: '高',
+        urgent: '紧急'
       }
       return map[level] || level
     }

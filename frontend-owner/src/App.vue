@@ -60,11 +60,12 @@ export default {
                 ? `工单 ${message.data.order_number}\n${message.data.message}`
                 : message.data.message || '工单状态已更新'
               
-              showNotify({
+              const notify = showNotify({
                 type: notifyType,
                 message: notifyMessage,
-                duration: 5000,
+                duration: 0,  // 不自动关闭，需用户手动点击
                 onClick: () => {
+                  notify.close()  // 点击后手动关闭通知
                   if (!message.data.deleted) {
                     router.push(`/repair/${message.data.id}`)
                   } else {
@@ -79,11 +80,12 @@ export default {
           } else if (role === 'maintenance') {
             // 维修人员端消息处理
             if (message.type === 'new_workorder') {
-              showNotify({
+              const notify = showNotify({
                 type: 'primary',
                 message: `您有新的维修工单！\n工单号：${message.data.order_number}`,
-                duration: 5000,
+                duration: 0,  // 不自动关闭
                 onClick: () => {
+                  notify.close()  // 点击后手动关闭通知
                   router.push(`/maintenance/workorder/${message.data.id}`)
                 }
               })
@@ -91,10 +93,14 @@ export default {
               // 通过Vuex通知页面更新
               store.dispatch('notifyNewWorkorder', message.data)
             } else if (message.type === 'workorder_deleted') {
-              showNotify({
+              const notify = showNotify({
                 type: 'danger',
                 message: `工单 ${message.data.order_number}\n${message.data.message}`,
-                duration: 5000
+                duration: 0,  // 不自动关闭
+                onClick: () => {
+                  notify.close()  // 点击后手动关闭通知
+                  router.push('/maintenance/workorders')  // 跳转到工单列表
+                }
               })
               
               // 通过Vuex通知页面更新

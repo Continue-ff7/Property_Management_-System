@@ -10,6 +10,7 @@ class UserBase(BaseModel):
     name: str
     phone: str
     email: Optional[EmailStr] = None
+    avatar: Optional[str] = None  # 头像 URL
 
 
 class UserCreate(UserBase):
@@ -76,11 +77,32 @@ class UserLogin(BaseModel):
     password: str
 
 
+class UserRegister(UserBase):
+    """用户注册（业主/维修人员）"""
+    password: str
+    role: str  # 'owner' 或 'maintenance'
+    
+    @field_validator('email', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == '':
+            return None
+        return v
+
+
 class UserResponse(UserBase):
     id: int
     role: str
     is_active: bool
     created_at: datetime
+    
+    @field_validator('email', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        """空字符串转为None，避免EmailStr验证失败"""
+        if v == '':
+            return None
+        return v
     
     class Config:
         from_attributes = True
@@ -240,8 +262,10 @@ class RepairOrderResponse(BaseModel):
 class RepairOrderWithDetails(RepairOrderResponse):
     owner_name: str
     owner_phone: str
+    owner_avatar: Optional[str] = None  # 添加业主头像
     property_info: str
     maintenance_worker_name: Optional[str] = None
+    maintenance_worker_avatar: Optional[str] = None  # 添加维修人员头像
 
 
 class RepairEvaluation(BaseModel):

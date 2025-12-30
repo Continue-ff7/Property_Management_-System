@@ -69,7 +69,12 @@ app.include_router(maintenance.router, prefix="/api/v1/maintenance", tags=["维�
 
 # 注册WebSocket路由
 app.include_router(websocket.router, tags=["WebSocket"])
-app.include_router(chat.router, tags=["聊天"])
+
+# 注册聊天WebSocket路由（不加前缀）
+app.include_router(chat.ws_router, tags=["聊天WebSocket"])
+
+# 注册聊天HTTP API路由（加前缀）
+app.include_router(chat.router, prefix="/api/v1", tags=["聊天API"])
 
 # 注册AI助手路由
 app.include_router(ai_assistant.router, prefix="/api/v1", tags=["AI助手"])

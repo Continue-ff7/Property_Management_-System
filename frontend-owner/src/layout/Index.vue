@@ -3,7 +3,7 @@
     <router-view class="content" />
     
     <van-tabbar v-model="active" route>
-      <van-tabbar-item to="/home" icon="wap-home">首页</van-tabbar-item>
+      <van-tabbar-item to="/home/index" icon="wap-home">首页</van-tabbar-item>
       <van-tabbar-item to="/bills" icon="balance-list">账单</van-tabbar-item>
       <van-tabbar-item to="/repairs" icon="service">报修</van-tabbar-item>
       <van-tabbar-item to="/profile" icon="user">我的</van-tabbar-item>
@@ -22,7 +22,7 @@ export default {
     const active = ref(0)
     
     const tabMap = {
-      '/home': 0,
+      '/home/index': 0,
       '/bills': 1,
       '/repairs': 2,
       '/profile': 3

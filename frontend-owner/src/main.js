@@ -6,6 +6,7 @@ import store from './store'
 // Vant UI
 import Vant from 'vant'
 import 'vant/lib/index.css'
+import './registerServiceWorker'
 
 const app = createApp(App)
 

@@ -4,13 +4,17 @@ from typing import Dict, Set, List
 import json
 from datetime import datetime
 
+# WebSocket路由器（不加前缀）
+ws_router = APIRouter()
+
+# HTTP API路由器（需要加前缀）
 router = APIRouter()
 
 # 存储聊天WebSocket连接：{repair_order_id: {user_id: websocket}}
 chat_connections: Dict[int, Dict[int, WebSocket]] = {}
 
 
-@router.websocket("/ws/chat/{repair_order_id}")
+@ws_router.websocket("/ws/chat/{repair_order_id}")
 async def chat_websocket(
     websocket: WebSocket,
     repair_order_id: int,

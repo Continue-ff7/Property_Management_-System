@@ -17,6 +17,7 @@ class User(Model):
     name = fields.CharField(max_length=50, description="真实姓名")
     phone = fields.CharField(max_length=20, description="手机号")
     email = fields.CharField(max_length=100, null=True, description="邮箱")
+    avatar = fields.CharField(max_length=500, null=True, description="头像URL")
     role = fields.CharEnumField(UserRole, description="用户角色")
     is_active = fields.BooleanField(default=True, description="是否激活")
     created_at = fields.DatetimeField(auto_now_add=True, description="创建时间")

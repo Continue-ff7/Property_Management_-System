@@ -12,9 +12,13 @@
       <div class="info-card">
         <div class="order-header">
           <span class="order-number">#{{ workorder.order_number }}</span>
-          <van-tag :type="getStatusType(workorder.status)">
+          <div 
+            class="status-badge"
+            :class="`status-${workorder.status}`"
+          >
+            <span class="status-dot"></span>
             {{ getStatusText(workorder.status) }}
-          </van-tag>
+          </div>
         </div>
         
         <van-cell-group>
@@ -22,9 +26,12 @@
           <van-cell title="问题描述" :value="workorder.description" />
           <van-cell title="紧急程度">
             <template #value>
-              <van-tag :type="getUrgencyType(workorder.urgency_level)">
+              <div 
+                class="urgency-badge"
+                :class="`urgency-${workorder.urgency_level}`"
+              >
                 {{ getUrgencyText(workorder.urgency_level) }}
-              </van-tag>
+              </div>
             </template>
           </van-cell>
           <van-cell title="提交时间" :value="formatDate(workorder.created_at)" />
@@ -55,35 +62,42 @@
         </div>
         
         <div class="contact-info">
-          <div class="info-item">
-            <span class="label">姓名：</span>
-            <span class="value">{{ workorder.owner_name }}</span>
+          <!-- 业主头像和基本信息 -->
+          <div class="owner-header" style="display: flex; align-items: center; margin-bottom: 12px;">
+            <van-image
+              round
+              width="50"
+              height="50"
+              :src="workorder.owner_avatar ? getImageUrl(workorder.owner_avatar) : 'https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg'"
+              style="margin-right: 12px;"
+            />
+            <div>
+              <div style="font-size: 16px; font-weight: 500; margin-bottom: 4px;">{{ workorder.owner_name }}</div>
+              <div style="font-size: 14px; color: #969799;">{{ workorder.owner_phone }}</div>
+            </div>
           </div>
-          <div class="info-item">
-            <span class="label">电话：</span>
-            <span class="value">
-              {{ workorder.owner_phone }}
-              <van-button 
-                type="primary" 
-                size="mini" 
-                @click="callOwner"
-                style="margin-left: 8px;"
-              >
-                拨打
-              </van-button>
-            </span>
+          
+          <div style="display: flex; gap: 8px;">
+            <van-button 
+              type="primary" 
+              size="small"
+              icon="phone-o"
+              @click="callOwner"
+              style="flex: 1;"
+            >
+              拨打电话
+            </van-button>
+            <van-button 
+              type="primary" 
+              size="small"
+              icon="chat-o"
+              @click="openChat"
+              style="flex: 1;"
+            >
+              实时聊天
+            </van-button>
           </div>
         </div>
-        
-        <van-button 
-          type="primary" 
-          block 
-          icon="chat-o"
-          @click="openChat"
-          style="margin-top: 12px;"
-        >
-          与业主实时聊天
-        </van-button>
       </div>
       
       <!-- 操作按钮 -->
@@ -304,7 +318,8 @@ export default {
         pending: '待分配',
         assigned: '待处理',
         in_progress: '处理中',
-        completed: '已完成'
+        completed: '已完成',
+        cancelled: '已取消'
       }
       return map[status] || status
     }
@@ -320,11 +335,12 @@ export default {
     
     const getUrgencyText = (level) => {
       const map = {
-        low: '一般',
-        medium: '紧急',
-        high: '非常紧急'
+        low: '低',
+        medium: '中',
+        high: '高',
+        urgent: '紧急'
       }
-      return map[level] || level
+      return map[level] || '低'
     }
     
     const formatDate = (date) => {
@@ -408,6 +424,76 @@ export default {
   font-size: 14px;
   font-weight: bold;
   color: #323233;
+}
+
+/* 状态徽章 */
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+}
+
+.status-badge .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: white;
+}
+
+.status-badge.status-assigned {
+  background: linear-gradient(135deg, #FF9500 0%, #FF6B00 100%);
+}
+
+.status-badge.status-in_progress {
+  background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+}
+
+.status-badge.status-completed {
+  background: linear-gradient(135deg, #52C41A 0%, #389E0D 100%);
+}
+
+.status-badge.status-cancelled {
+  background: linear-gradient(135deg, #999999 0%, #666666 100%);
+}
+
+.status-badge.status-pending {
+  background: linear-gradient(135deg, #FF9500 0%, #FF6B00 100%);
+}
+
+/* 紧急程度徽章 */
+.urgency-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  text-align: center;
+}
+
+/* 低 - 蓝色 */
+.urgency-badge.urgency-low {
+  background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+}
+
+/* 中 - 黄色/橙色 */
+.urgency-badge.urgency-medium {
+  background: linear-gradient(135deg, #FAAD14 0%, #D48806 100%);
+}
+
+/* 高 - 橙红色 */
+.urgency-badge.urgency-high {
+  background: linear-gradient(135deg, #FF6B00 0%, #E85500 100%);
+}
+
+/* 紧急 - 红色 */
+.urgency-badge.urgency-urgent {
+  background: linear-gradient(135deg, #F5222D 0%, #CF1322 100%);
 }
 
 .images-section {

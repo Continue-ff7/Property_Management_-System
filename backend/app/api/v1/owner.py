@@ -1,5 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, status
-from app.core.dependencies import get_current_owner, generate_order_number
+from fastapi.responses import FileResponse, HTMLResponse
+from app.core.dependencies import get_current_owner, get_current_owner_optional_token, generate_order_number
+from pydantic import BaseModel
 from app.models import User, Property, Bill, RepairOrder, Building, BillStatus, RepairStatus
 from app.schemas import (
     PropertyWithOwner, BillWithDetails, BillResponse,
@@ -8,7 +10,14 @@ from app.schemas import (
 )
 from typing import List
 from datetime import datetime
+import hashlib
+import uuid
+import os
 import io
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import mm
+from app.core.config import settings
 #from reportlab.lib.pagesizes import letter
 #from reportlab.pdfgen import canvas
 #from reportlab.pdfbase import pdfmetrics
@@ -16,6 +25,13 @@ import io
 #from fastapi.responses import StreamingResponse
 
 router = APIRouter()
+
+
+# 用户信息更新请求模型
+class UpdateProfileRequest(BaseModel):
+    name: str = None
+    email: str = None
+    avatar: str = None  # 头像URL
 
 
 @router.get("/profile")
@@ -27,7 +43,41 @@ async def get_profile(current_user: User = Depends(get_current_owner)):
         "name": current_user.name,
         "phone": current_user.phone,
         "email": current_user.email,
+        "avatar": current_user.avatar,
         "created_at": current_user.created_at
+    }
+
+
+@router.put("/profile")
+async def update_profile(
+    update_data: UpdateProfileRequest,
+    current_user: User = Depends(get_current_owner)
+):
+    """更新个人信息"""
+    # 更新字段
+    if update_data.name is not None:
+        current_user.name = update_data.name
+    
+    if update_data.email is not None:
+        current_user.email = update_data.email
+    
+    if update_data.avatar is not None:
+        current_user.avatar = update_data.avatar
+    
+    await current_user.save()
+    
+    return {
+        "message": "个人信息更新成功",
+        "data": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "name": current_user.name,
+            "phone": current_user.phone,
+            "email": current_user.email,
+            "avatar": current_user.avatar,
+            "role": current_user.role,  # 必须返回 role 字段，否则前端路由守卫会判断角色不匹配
+            "created_at": current_user.created_at
+        }
     }
 
 
@@ -64,8 +114,15 @@ async def get_my_bills(
     """获取个人缴费记录和账单"""
     query = Bill.filter(owner_id=current_user.id)
     
+    # 如果有status参数，过滤状态
     if status:
-        query = query.filter(status=status)
+        # 将字符串转换为BillStatus枚举
+        try:
+            bill_status = BillStatus(status)
+            query = query.filter(status=bill_status)
+        except ValueError:
+            # 如果传入的status不合法，忽略过滤条件
+            pass
     
     bills = await query.order_by("-created_at").offset(skip).limit(limit).prefetch_related("property", "property__building")
     
@@ -128,44 +185,419 @@ async def pay_bill(
 @router.get("/bills/{bill_id}/invoice")
 async def download_invoice(
     bill_id: int,
-    current_user: User = Depends(get_current_owner)
+    current_user: User = Depends(get_current_owner_optional_token)
 ):
-    """下载个人缴费发票"""
-    bill = await Bill.get_or_none(id=bill_id, owner_id=current_user.id).prefetch_related("property", "property__building")
-    
+    """下载个人缴费发票（PDF + 二维码）"""
+    bill = await Bill.get_or_none(id=bill_id, owner_id=current_user.id)
     if not bill:
         raise HTTPException(status_code=404, detail="账单不存在")
     
+    await bill.fetch_related("property", "property__building")
+    
     if bill.status != BillStatus.PAID:
         raise HTTPException(status_code=400, detail="账单未支付，无法下载发票")
-    ''' 
+    
+    # 生成或获取验证码
+    if not bill.invoice_url:
+        verification_data = f"{bill.id}-{bill.paid_at.isoformat()}-{uuid.uuid4().hex[:8]}"
+        verification_code = hashlib.md5(verification_data.encode()).hexdigest()[:16]
+        bill.invoice_url = verification_code
+        await bill.save()
+    else:
+        verification_code = bill.invoice_url
+    
+    # 生成验证URL（使用配置的后端地址，支持局域网访问）
+    # 修改 .env 中的 BACKEND_HOST 可切换局域网IP（如：192.168.64.24:8088）
+    verify_url = f"http://{settings.BACKEND_HOST}/api/v1/owner/bills/verify/{verification_code}"
+    
     # 生成PDF发票
-    buffer = io.BytesIO()
-    p = canvas.Canvas(buffer, pagesize=letter)
+    pdf_path = generate_invoice_pdf(bill, current_user, verification_code, verify_url)
     
-    # 添加发票内容
-    p.setFont("Helvetica-Bold", 16)
-    p.drawString(100, 750, "Payment Invoice")
-    
-    p.setFont("Helvetica", 12)
-    p.drawString(100, 700, f"Invoice ID: {bill.id}")
-    p.drawString(100, 680, f"Owner: {current_user.name}")
-    p.drawString(100, 660, f"Property: {bill.property.building.name} {bill.property.unit}-{bill.property.room_number}")
-    p.drawString(100, 640, f"Fee Type: {bill.fee_type.value}")
-    p.drawString(100, 620, f"Amount: {bill.amount} CNY")
-    p.drawString(100, 600, f"Billing Period: {bill.billing_period}")
-    p.drawString(100, 580, f"Paid At: {bill.paid_at.strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    p.showPage()
-    p.save()
-    
-    buffer.seek(0)
-    return StreamingResponse(
-        buffer,
+    # 返回PDF文件
+    return FileResponse(
+        pdf_path,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=invoice_{bill.id}.pdf"}
+        filename=f"invoice_{bill.id}_{bill.billing_period.replace(' ', '_')}.pdf"
     )
-'''
+
+
+def generate_invoice_pdf(bill, owner, verification_code, verify_url):
+    """生成PDF发票（带二维码）"""
+    # 延迟导入qrcode，避免模块初始化时报错
+    try:
+        import qrcode
+    except ImportError:
+        raise HTTPException(status_code=500, detail="qrcode库未安装，请运行: pip install qrcode[pil]")
+    
+    # 确保发票目录存在
+    invoice_dir = os.path.join(settings.UPLOAD_DIR, "invoices")
+    os.makedirs(invoice_dir, exist_ok=True)
+    
+    pdf_filename = f"invoice_{bill.id}.pdf"
+    pdf_path = os.path.join(invoice_dir, pdf_filename)
+    
+    # 生成二维码图片
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(verify_url)
+    qr.make(fit=True)
+    qr_img = qr.make_image(fill_color="black", back_color="white")
+    
+    # 保存二维码图片
+    qr_path = os.path.join(invoice_dir, f"qr_{bill.id}.png")
+    qr_img.save(qr_path)
+    
+    # 创建PDF
+    c = canvas.Canvas(pdf_path, pagesize=A4)
+    width, height = A4
+    
+    # 设置颜色
+    primary_color = (0.4, 0.49, 0.92)  # #667eea
+    
+    # 标题区域（渐变背景）
+    c.setFillColorRGB(*primary_color)
+    c.rect(0, height - 120*mm, width, 120*mm, fill=True, stroke=False)
+    
+    # 标题
+    c.setFillColorRGB(1, 1, 1)  # 白色
+    c.setFont("Helvetica-Bold", 32)
+    c.drawCentredString(width/2, height - 40*mm, "PAYMENT INVOICE")
+    
+    c.setFont("Helvetica", 18)
+    c.drawCentredString(width/2, height - 55*mm, "Payment Receipt")  # 使用英文替代
+    
+    # 发票编号
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(width/2, height - 75*mm, f"Invoice No: INV-{bill.id:06d}")
+    
+    # 信息区域
+    y = height - 140*mm
+    x_left = 40*mm
+    x_right = width - 40*mm
+    
+    c.setFillColorRGB(0, 0, 0)
+    
+    # 左侧：业主信息
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(x_left, y, "Bill To:")
+    y -= 15
+    c.setFont("Helvetica", 10)
+    c.drawString(x_left, y, f"Name: {owner.name}")
+    y -= 12
+    c.drawString(x_left, y, f"Phone: {owner.phone}")
+    y -= 12
+    property_info = f"{bill.property.building.name} {bill.property.unit}-{bill.property.room_number}"
+    c.drawString(x_left, y, f"Property: {property_info}")
+    
+    # 右侧：物业信息
+    y = height - 140*mm
+    c.setFont("Helvetica-Bold", 12)
+    c.drawRightString(x_right, y, "Property Management:")
+    y -= 15
+    c.setFont("Helvetica", 10)
+    c.drawRightString(x_right, y, "XX Property Management Co.")
+    y -= 12
+    c.drawRightString(x_right, y, "Tel: 400-123-4567")
+    y -= 12
+    c.drawRightString(x_right, y, f"Date: {bill.paid_at.strftime('%Y-%m-%d')}")
+    
+    # 分隔线
+    y -= 20
+    c.setStrokeColorRGB(0.9, 0.9, 0.9)
+    c.line(x_left, y, x_right, y)
+    
+    # 账单详情表格
+    y -= 30
+    table_y = y
+    
+    # 表头
+    c.setFillColorRGB(0.95, 0.95, 0.95)
+    c.rect(x_left, table_y - 20, x_right - x_left, 20, fill=True, stroke=False)
+    
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(x_left + 5, table_y - 13, "Fee Type")
+    c.drawString(x_left + 80, table_y - 13, "Billing Period")
+    c.drawString(x_left + 160, table_y - 13, "Due Date")
+    c.drawString(x_left + 240, table_y - 13, "Amount (CNY)")
+    
+    # 表格数据
+    table_y -= 20
+    c.setFont("Helvetica", 10)
+    
+    fee_type_map = {
+        "property": "Property Fee",
+        "parking": "Parking Fee",
+        "water": "Water",
+        "electricity": "Electricity"
+    }
+    fee_type_text = fee_type_map.get(bill.fee_type.value, bill.fee_type.value)
+    
+    c.drawString(x_left + 5, table_y - 13, fee_type_text)
+    c.drawString(x_left + 80, table_y - 13, bill.billing_period)
+    c.drawString(x_left + 160, table_y - 13, str(bill.due_date))
+    c.drawString(x_left + 240, table_y - 13, f"CNY {float(bill.amount):.2f}")
+    
+    # 底部分隔线
+    table_y -= 20
+    c.setStrokeColorRGB(0.9, 0.9, 0.9)
+    c.line(x_left, table_y, x_right, table_y)
+    
+    # 总计
+    table_y -= 30
+    c.setFont("Helvetica-Bold", 14)
+    c.drawRightString(x_right - 120, table_y, "Total Amount:")
+    c.setFillColorRGB(*primary_color)
+    c.setFont("Helvetica-Bold", 20)
+    c.drawRightString(x_right, table_y, f"CNY {float(bill.amount):.2f}")
+    
+    # 二维码区域
+    qr_y = table_y - 100
+    
+    # 二维码标题
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(width/2, qr_y + 20, "Scan QR Code to Verify Invoice")
+    
+    # 插入二维码图片
+    qr_size = 80
+    c.drawImage(qr_path, width/2 - qr_size/2, qr_y - qr_size - 20, qr_size, qr_size)
+    
+    # 验证码
+    c.setFont("Helvetica", 8)
+    c.setFillColorRGB(0.5, 0.5, 0.5)
+    c.drawCentredString(width/2, qr_y - qr_size - 35, f"Verification Code: {verification_code}")
+    
+    # 页脚
+    c.setFont("Helvetica", 8)
+    c.drawCentredString(width/2, 30, "Thank you for your payment!")
+    c.drawCentredString(width/2, 20, f"Generated at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # 保存PDF
+    c.save()
+    
+    # 删除临时二维码图片
+    try:
+        os.remove(qr_path)
+    except:
+        pass
+    
+    return pdf_path
+
+
+@router.get("/bills/verify/{verification_code}", response_class=HTMLResponse)
+async def verify_invoice(verification_code: str):
+    """验证发票真伪（扫码后跳转的页面）"""
+    # 查找对应的账单
+    bill = await Bill.get_or_none(invoice_url=verification_code)
+    
+    if not bill:
+        # 发票不存在
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="zh-CN">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>发票验证</title>
+            <style>
+                body {{
+                    font-family: "Microsoft YaHei", Arial, sans-serif;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 20px;
+                }}
+                .result-card {{
+                    background: white;
+                    padding: 40px;
+                    border-radius: 12px;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                    text-align: center;
+                    max-width: 500px;
+                }}
+                .icon {{
+                    font-size: 64px;
+                    margin-bottom: 20px;
+                }}
+                h1 {{
+                    color: #f56c6c;
+                    margin-bottom: 10px;
+                }}
+                p {{
+                    color: #666;
+                    line-height: 1.8;
+                }}
+                .code {{
+                    background: #f5f5f5;
+                    padding: 10px;
+                    border-radius: 4px;
+                    margin-top: 20px;
+                    color: #999;
+                    font-family: monospace;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="result-card">
+                <div class="icon">❌</div>
+                <h1>发票不存在</h1>
+                <p>抱歉，未找到对应的发票记录。</p>
+                <p>请检查验证码是否正确，或联系物业客服。</p>
+                <div class="code">验证码：{verification_code}</div>
+            </div>
+        </body>
+        </html>
+        """
+    else:
+        # 发票存在，显示验证结果
+        await bill.fetch_related("owner", "property", "property__building")
+        
+        fee_type_map = {
+            "property": "物业费",
+            "parking": "停车费",
+            "water": "水费",
+            "electricity": "电费"
+        }
+        fee_type_text = fee_type_map.get(bill.fee_type.value, bill.fee_type.value)
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="zh-CN">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>发票验证结果</title>
+            <style>
+                body {{
+                    font-family: "Microsoft YaHei", Arial, sans-serif;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    min-height: 100vh;
+                    padding: 20px;
+                }}
+                .result-card {{
+                    background: white;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    border-radius: 12px;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                    overflow: hidden;
+                }}
+                .header {{
+                    background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
+                    color: white;
+                    padding: 30px;
+                    text-align: center;
+                }}
+                .icon {{
+                    font-size: 64px;
+                    margin-bottom: 10px;
+                }}
+                h1 {{
+                    font-size: 28px;
+                    margin: 0;
+                }}
+                .body {{
+                    padding: 30px;
+                }}
+                .info-row {{
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 12px 0;
+                    border-bottom: 1px solid #f0f0f0;
+                }}
+                .info-row:last-child {{
+                    border-bottom: none;
+                }}
+                .label {{
+                    color: #999;
+                    font-size: 14px;
+                }}
+                .value {{
+                    color: #333;
+                    font-weight: 500;
+                    font-size: 14px;
+                }}
+                .amount-row {{
+                    background: #f5f5f5;
+                    padding: 20px;
+                    border-radius: 8px;
+                    margin: 20px 0;
+                    text-align: center;
+                }}
+                .amount {{
+                    font-size: 32px;
+                    color: #52c41a;
+                    font-weight: bold;
+                }}
+                .footer {{
+                    text-align: center;
+                    padding: 20px;
+                    background: #f9f9f9;
+                    color: #999;
+                    font-size: 12px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="result-card">
+                <div class="header">
+                    <div class="icon">✅</div>
+                    <h1>发票验证成功</h1>
+                    <p style="margin-top: 10px; opacity: 0.9;">该发票真实有效</p>
+                </div>
+                <div class="body">
+                    <div class="info-row">
+                        <span class="label">发票编号</span>
+                        <span class="value">INV-{bill.id:06d}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">业主姓名</span>
+                        <span class="value">{bill.owner.name}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">房产地址</span>
+                        <span class="value">{bill.property.building.name} {bill.property.unit}单元{bill.property.room_number}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">费用类型</span>
+                        <span class="value">{fee_type_text}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">账期</span>
+                        <span class="value">{bill.billing_period}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">支付时间</span>
+                        <span class="value">{bill.paid_at.strftime('%Y年%m月%d日 %H:%M')}</span>
+                    </div>
+                    
+                    <div class="amount-row">
+                        <div class="label">支付金额</div>
+                        <div class="amount">￥{float(bill.amount):.2f}</div>
+                    </div>
+                    
+                    <div class="info-row">
+                        <span class="label">验证码</span>
+                        <span class="value">{verification_code}</span>
+                    </div>
+                </div>
+                <div class="footer">
+                    <p>此发票由XX物业管理有限公司开具</p>
+                    <p style="margin-top: 5px;">验证时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+    
+    return HTMLResponse(content=html_content)
 
 @router.post("/repairs", response_model=RepairOrderWithDetails)
 async def create_repair_order(
@@ -255,6 +687,7 @@ async def get_my_repair_orders(
     for order in orders:
         property_info = f"{order.property.building.name}{order.property.unit}单元{order.property.room_number}"
         maintenance_worker_name = order.maintenance_worker.name if order.maintenance_worker else None
+        maintenance_worker_avatar = order.maintenance_worker.avatar if order.maintenance_worker else None
         
         result.append({
             "id": order.id,
@@ -275,8 +708,10 @@ async def get_my_repair_orders(
             "created_at": order.created_at,
             "owner_name": current_user.name,
             "owner_phone": current_user.phone,
+            "owner_avatar": current_user.avatar,  # 添加业主头像
             "property_info": property_info,
-            "maintenance_worker_name": maintenance_worker_name
+            "maintenance_worker_name": maintenance_worker_name,
+            "maintenance_worker_avatar": maintenance_worker_avatar  # 添加维修人员头像
         })
     
     return result

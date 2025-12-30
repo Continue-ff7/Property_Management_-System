@@ -1,6 +1,11 @@
 <template>
   <div class="bills-page">
-    <van-nav-bar title="我的账单" fixed />
+    <van-nav-bar 
+      title="我的账单" 
+      left-arrow
+      @click-left="$router.back()"
+      fixed 
+    />
     
     <div class="content">
       <van-tabs v-model="activeTab" @change="loadBills">
@@ -59,7 +64,11 @@
     </div>
     
     <!-- 支付弹窗 -->
-    <van-action-sheet :show="showPaySheet" @update:show="showPaySheet = $event" title="选择支付方式">
+    <van-action-sheet 
+      :show="showPaySheet" 
+      @update:show="showPaySheet = $event" 
+      title="选择支付方式"
+    >
       <div class="pay-content">
         <!-- 支付金额 -->
         <div class="pay-amount" v-if="currentBill">

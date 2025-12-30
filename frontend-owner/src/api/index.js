@@ -9,6 +9,14 @@ export const authAPI = {
       method: 'post',
       data
     })
+  },
+  // 注册
+  register(data) {
+    return request({
+      url: '/auth/register',
+      method: 'post',
+      data
+    })
   }
 }
 
@@ -19,6 +27,14 @@ export const ownerAPI = {
     return request({
       url: '/owner/profile',
       method: 'get'
+    })
+  },
+  // 更新个人信息
+  updateProfile(data) {
+    return request({
+      url: '/owner/profile',
+      method: 'put',
+      data
     })
   },
   // 获取我的房产
@@ -156,6 +172,25 @@ export const maintenanceWorkorderAPI = {
     return request({
       url: '/maintenance/statistics',
       method: 'get'
+    })
+  }
+}
+
+// 维修人员API
+export const maintenanceAPI = {
+  // 获取个人信息
+  getProfile() {
+    return request({
+      url: '/maintenance/profile',
+      method: 'get'
+    })
+  },
+  // 更新个人信息
+  updateProfile(data) {
+    return request({
+      url: '/maintenance/profile',
+      method: 'put',
+      data
     })
   }
 }

@@ -2,22 +2,25 @@
   <div class="profile-page">
     <van-nav-bar
       title="个人中心"
+      left-arrow
+      @click-left="$router.back()"
       fixed
     />
     
     <div class="content">
       <!-- 个人信息卡片 -->
-      <div class="user-card">
+      <div class="user-card" @click="handleCardClick">
         <van-image
           round
           width="60"
           height="60"
-          src="https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg"
+          :src="avatarUrl"
         />
         <div class="user-info">
           <div class="name">{{ userInfo.name || userInfo.username }}</div>
           <div class="role">维修人员</div>
         </div>
+        <van-icon name="edit" color="white" size="18" style="margin-left: auto;" />
       </div>
       
       <!-- 统计信息 -->
@@ -39,7 +42,7 @@
       <!-- 功能列表 -->
       <van-cell-group inset style="margin-top: 16px;">
         <van-cell title="我的工单" is-link @click="goTo('/maintenance/workorders')" />
-        <van-cell title="个人信息" is-link />
+        <van-cell title="个人信息" is-link @click="handleEditClick" />
         <van-cell title="系统设置" is-link />
       </van-cell-group>
       
@@ -49,6 +52,58 @@
         </van-button>
       </div>
     </div>
+    
+    <!-- 编辑个人信息弹窗 -->
+    <van-dialog
+      :show="showEdit"
+      title="编辑个人信息"
+      show-cancel-button
+      @confirm="handleSaveProfile"
+      @cancel="showEdit = false"
+      @close="showEdit = false"
+    >
+      <div class="edit-form">
+        <!-- 头像上传 -->
+        <div class="avatar-upload-section">
+          <van-uploader
+            v-model="avatarFile"
+            :max-count="1"
+            :after-read="handleAvatarUpload"
+            :deletable="true"
+          >
+            <van-image
+              round
+              width="80"
+              height="80"
+              :src="getImageUrl(editForm.avatar) || 'https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg'"
+              fit="cover"
+            />
+          </van-uploader>
+          <div class="upload-hint">点击头像更换</div>
+        </div>
+        
+        <!-- 表单字段 -->
+        <van-cell-group inset>
+          <van-field
+            v-model="editForm.name"
+            label="姓名"
+            placeholder="请输入姓名"
+            :rules="[{ required: true, message: '请输入姓名' }]"
+          />
+          <van-field
+            v-model="editForm.email"
+            label="邮箱"
+            placeholder="请输入邮箱"
+            type="email"
+          />
+          <van-field
+            v-model="editForm.phone"
+            label="手机号"
+            placeholder="请输入手机号"
+          />
+        </van-cell-group>
+      </div>
+    </van-dialog>
   </div>
 </template>
 
@@ -56,8 +111,9 @@
 import { ref, computed, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useStore } from 'vuex'
-import { showConfirmDialog, showSuccessToast } from 'vant'
-import { maintenanceWorkorderAPI } from '@/api'
+import { showConfirmDialog, showSuccessToast, showToast, showLoadingToast } from 'vant'
+import { maintenanceWorkorderAPI, maintenanceAPI, uploadAPI } from '@/api'
+import { getImageUrl } from '@/utils/request'
 
 export default {
   name: 'MaintenanceProfile',
@@ -71,6 +127,39 @@ export default {
       in_progress: 0
     })
     
+    const showEdit = ref(false)
+    const avatarFile = ref([])
+    const editForm = reactive({
+      name: '',
+      phone: '',
+      email: '',
+      avatar: ''
+    })
+    
+    // 计算头像URL
+    const avatarUrl = computed(() => {
+      if (userInfo.value?.avatar) {
+        return getImageUrl(userInfo.value.avatar)
+      }
+      return 'https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg'
+    })
+    
+    // 点击卡片，打开编辑弹窗
+    const handleCardClick = () => {
+      // 填充表单
+      editForm.name = userInfo.value?.name || ''
+      editForm.phone = userInfo.value?.phone || ''
+      editForm.email = userInfo.value?.email || ''
+      editForm.avatar = userInfo.value?.avatar || ''
+      
+      showEdit.value = true
+    }
+    
+    // 点击编辑按钮
+    const handleEditClick = () => {
+      handleCardClick()
+    }
+    
     const loadStats = async () => {
       try {
         const data = await maintenanceWorkorderAPI.getMyWorkorders()
@@ -79,6 +168,67 @@ export default {
         stats.in_progress = data.filter(w => w.status === 'in_progress').length
       } catch (error) {
         console.error('加载统计失败:', error)
+      }
+    }
+    
+    // 上传头像
+    const handleAvatarUpload = async (file) => {
+      const loading = showLoadingToast({
+        message: '上传中...',
+        forbidClick: true,
+        duration: 0
+      })
+      
+      try {
+        const result = await uploadAPI.upload(file.file)
+        editForm.avatar = result.url
+        showSuccessToast('头像上传成功')
+      } catch (error) {
+        showToast('头像上传失败')
+        console.error(error)
+      } finally {
+        loading.close()
+      }
+    }
+    
+    // 保存个人信息
+    const handleSaveProfile = async () => {
+      if (!editForm.name.trim()) {
+        showToast('请输入姓名')
+        return
+      }
+      
+      const loading = showLoadingToast({
+        message: '保存中...',
+        forbidClick: true,
+        duration: 0
+      })
+      
+      try {
+        const updateData = {}
+        if (editForm.name) updateData.name = editForm.name
+        if (editForm.phone) updateData.phone = editForm.phone
+        if (editForm.email) updateData.email = editForm.email
+        if (editForm.avatar) updateData.avatar = editForm.avatar
+        
+        const res = await maintenanceAPI.updateProfile(updateData)
+        
+        // 更新Vuex中的用户信息
+        store.commit('SET_USER_INFO', {
+          ...userInfo.value,
+          name: res.name,
+          phone: res.phone,
+          email: res.email,
+          avatar: res.avatar
+        })
+        
+        showSuccessToast('保存成功')
+        showEdit.value = false
+      } catch (error) {
+        showToast('保存失败')
+        console.error('保存失败:', error)
+      } finally {
+        loading.close()
       }
     }
     
@@ -108,8 +258,17 @@ export default {
     return {
       userInfo,
       stats,
+      avatarUrl,
+      showEdit,
+      avatarFile,
+      editForm,
+      handleCardClick,
+      handleEditClick,
       goTo,
-      handleLogout
+      handleLogout,
+      handleAvatarUpload,
+      handleSaveProfile,
+      getImageUrl
     }
   }
 }
@@ -175,5 +334,27 @@ export default {
 .stat-item .label {
   font-size: 13px;
   color: #969799;
+}
+
+/* 编辑弹窗样式 */
+.edit-form {
+  padding: 20px;
+}
+
+.avatar-upload-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.upload-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #999;
+}
+
+.edit-form :deep(.van-cell-group) {
+  margin-top: 16px;
 }
 </style>

@@ -7,7 +7,7 @@
           round
           width="40"
           height="40"
-          src="https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg"
+          :src="avatarUrl"
         />
         <div class="info">
           <div class="name">{{ userInfo.name || userInfo.username }}</div>
@@ -41,31 +41,32 @@
           >
             <div class="card-header">
               <span class="order-number">{{ order.order_number }}</span>
-              <van-tag 
-                :color="getStatusColor(order.status)"
-                text-color="#fff"
-                plain
-                size="medium"
+              <div 
+                class="urgency-badge"
+                :class="`urgency-${order.urgency_level}`"
               >
-                {{ getStatusText(order.status) }}
-              </van-tag>
+                {{ getUrgencyBadgeText(order.urgency_level) }}
+              </div>
             </div>
             
             <div class="card-body">
               <div class="location">
-                {{ order.property_info }} · 面积 {{ order.area || '100' }} ㎡
+                {{ order.property_info }}
               </div>
-              <div class="tags">
-                <van-tag size="medium">紧急程度：{{ getUrgencyText(order.urgency_level) }}</van-tag>
+              <div class="description">
+                {{ order.description }}
               </div>
               <div class="time">{{ formatDate(order.created_at) }}</div>
             </div>
             
             <div class="card-footer">
-              <span class="status-text">
-                <van-icon name="clock-o" />
-                {{ getStatusDescription(order.status) }}
-              </span>
+              <div class="status-info">
+                <span 
+                  class="status-dot"
+                  :class="`status-${order.status}`"
+                ></span>
+                <span class="status-text">{{ getStatusDescription(order.status) }}</span>
+              </div>
               <van-button 
                 type="primary" 
                 size="small"
@@ -104,6 +105,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 import { maintenanceWorkorderAPI } from '@/api'
+import { getImageUrl } from '@/utils/request'
 
 export default {
   name: 'MaintenanceWorkorders',
@@ -122,6 +124,14 @@ export default {
       pending: 0,
       in_progress: 0,
       completed: 0
+    })
+    
+    // 计算头像URL
+    const avatarUrl = computed(() => {
+      if (userInfo.value?.avatar) {
+        return getImageUrl(userInfo.value.avatar)
+      }
+      return 'https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg'
     })
     
     const loadWorkorders = async () => {
@@ -171,9 +181,10 @@ export default {
     const getStatusText = (status) => {
       const map = {
         pending: '待分配',
-        assigned: '金色',
-        in_progress: '绿色',
-        completed: '蓝色'
+        assigned: '待处理',
+        in_progress: '处理中',
+        completed: '已完成',
+        cancelled: '已取消'
       }
       return map[status] || status
     }
@@ -183,7 +194,8 @@ export default {
         pending: '待分配',
         assigned: '待处理',
         in_progress: '处理中',
-        completed: '已完成'
+        completed: '已完成',
+        cancelled: '已取消'
       }
       return map[status] || status
     }
@@ -198,11 +210,22 @@ export default {
     
     const getUrgencyText = (level) => {
       const map = {
-        low: '一般',
-        medium: '紧急',
-        high: '非常紧急'
+        low: '低',
+        medium: '中',
+        high: '高',
+        urgent: '紧急'
       }
       return map[level] || level
+    }
+    
+    const getUrgencyBadgeText = (level) => {
+      const map = {
+        low: '低',
+        medium: '中',
+        high: '高',
+        urgent: '紧急'
+      }
+      return map[level] || '低'
     }
     
     const formatDate = (date) => {
@@ -243,6 +266,7 @@ export default {
     
     return {
       userInfo,
+      avatarUrl,
       workorders,
       loading,
       finished,
@@ -259,6 +283,7 @@ export default {
       getStatusText,
       getStatusDescription,
       getUrgencyText,
+      getUrgencyBadgeText,
       formatDate
     }
   }
@@ -345,6 +370,38 @@ export default {
   color: #323233;
 }
 
+/* 紧急程度徽章 - 圆角标签样式 */
+.urgency-badge {
+  padding: 4px 12px;
+  border-radius: 12px 0 0 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  position: relative;
+  min-width: 50px;
+  text-align: center;
+}
+
+/* 低 - 蓝色 */
+.urgency-badge.urgency-low {
+  background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+}
+
+/* 中 - 黄色/橙色 */
+.urgency-badge.urgency-medium {
+  background: linear-gradient(135deg, #FAAD14 0%, #D48806 100%);
+}
+
+/* 高 - 橙红色 */
+.urgency-badge.urgency-high {
+  background: linear-gradient(135deg, #FF6B00 0%, #E85500 100%);
+}
+
+/* 紧急 - 红色 */
+.urgency-badge.urgency-urgent {
+  background: linear-gradient(135deg, #F5222D 0%, #CF1322 100%);
+}
+
 .card-body {
   padding: 12px 16px;
 }
@@ -354,6 +411,18 @@ export default {
   color: #323233;
   margin-bottom: 8px;
   font-weight: 500;
+}
+
+.description {
+  font-size: 13px;
+  color: #646566;
+  margin-bottom: 8px;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .tags {
@@ -374,10 +443,40 @@ export default {
   background: #fafafa;
 }
 
-.status-text {
+.status-info {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.status-assigned {
+  background: #FF9500;
+}
+
+.status-dot.status-in_progress {
+  background: #4A90E2;
+}
+
+.status-dot.status-completed {
+  background: #52C41A;
+}
+
+.status-dot.status-cancelled {
+  background: #999999;
+}
+
+.status-dot.status-pending {
+  background: #FF9500;
+}
+
+.status-text {
   font-size: 13px;
   color: #646566;
 }
