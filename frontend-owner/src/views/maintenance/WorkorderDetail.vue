@@ -186,8 +186,9 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useStore } from 'vuex'
 import { showToast, showSuccessToast, showImagePreview, showDialog } from 'vant'
 import { maintenanceWorkorderAPI } from '@/api'
 import { getImageUrl, getWebSocketUrl } from '@/utils/request'
@@ -197,6 +198,7 @@ export default {
   setup() {
     const route = useRoute()
     const router = useRouter()
+    const store = useStore()
     const workorder = ref(null)
     const showChat = ref(false)
     const messages = ref([])
@@ -359,6 +361,37 @@ export default {
     onMounted(() => {
       loadDetail()
     })
+    
+    // 监听Vuex中的新工单通知（刷新详情）
+    watch(
+      () => store.state.newWorkorder,
+      (newVal) => {
+        if (newVal) {
+          const currentWorkorderId = parseInt(route.params.id)
+          if (newVal.id === currentWorkorderId) {
+            console.log('当前工单状态更新，刷新详情')
+            loadDetail()
+          }
+        }
+      }
+    )
+    
+    // 监听Vuex中的工单被删除通知
+    watch(
+      () => store.state.workorderDeleted,
+      (newVal) => {
+        if (newVal) {
+          const currentWorkorderId = parseInt(route.params.id)
+          if (newVal.id === currentWorkorderId) {
+            console.log('当前工单已被删除，返回列表')
+            showToast('工单已被管理员撤销')
+            setTimeout(() => {
+              router.push('/maintenance/workorders')
+            }, 1500)
+          }
+        }
+      }
+    )
     
     onUnmounted(() => {
       if (ws) {

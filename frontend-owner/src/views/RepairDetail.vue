@@ -192,8 +192,9 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useStore } from 'vuex'
 import { showToast, showSuccessToast, showImagePreview } from 'vant'
 import { repairAPI } from '@/api'
 import { getImageUrl } from '@/utils/request'
@@ -203,6 +204,7 @@ export default {
   setup() {
     const route = useRoute()
     const router = useRouter()
+    const store = useStore()
     const repair = ref({})
     const showEvalDialog = ref(false)
     const showChatDialog = ref(false)
@@ -321,6 +323,21 @@ export default {
     onMounted(() => {
       loadRepairDetail()
     })
+    
+    // 监听Vuex中的工单状态更新通知
+    watch(
+      () => store.state.repairStatusUpdate,
+      (newVal) => {
+        if (newVal) {
+          // 判断是否是当前工单的更新
+          const currentRepairId = parseInt(route.params.id)
+          if (newVal.id === currentRepairId) {
+            console.log('当前工单状态更新，刷新详情')
+            loadRepairDetail()  // 刷新详情数据
+          }
+        }
+      }
+    )
     
     return {
       repair,

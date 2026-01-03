@@ -8,8 +8,8 @@ router = APIRouter()
 # 存储维修人员的WebSocket连接
 maintenance_connections: Dict[int, Set[WebSocket]] = {}
 
-# 存储管理员的WebSocket连接
-manager_connections: Set[WebSocket] = set()
+# 存储管理员的WebSocket连接（改用字典，支持多个管理员）
+manager_connections: Dict[int, Set[WebSocket]] = {}
 
 # 存储业主的WebSocket连接
 owner_connections: Dict[int, Set[WebSocket]] = {}
@@ -81,17 +81,21 @@ async def notify_workorder_update(maintenance_worker_id: int, order_id: int, upd
                 maintenance_connections[maintenance_worker_id].discard(websocket)
 
 
-@router.websocket("/ws/manager")
+@router.websocket("/ws/manager/{user_id}")
 async def manager_websocket(
     websocket: WebSocket,
+    user_id: int,
     token: str = Query(...)
 ):
     """管理员WebSocket连接 - 接收新报修通知"""
     await websocket.accept()
     
     try:
-        # 添加连接
-        manager_connections.add(websocket)
+        # 添加连接到管理器（按用户ID管理）
+        if user_id not in manager_connections:
+            manager_connections[user_id] = set()
+        manager_connections[user_id].add(websocket)
+        print(f"[WebSocket] 管理员 {user_id} 连接成功, 当前连接数: {len(manager_connections[user_id])}")
         
         try:
             while True:
@@ -100,27 +104,40 @@ async def manager_websocket(
                 if data == "ping":
                     await websocket.send_text("pong")
         except WebSocketDisconnect:
-            manager_connections.discard(websocket)
+            # 移除连接
+            manager_connections[user_id].discard(websocket)
+            if not manager_connections[user_id]:
+                del manager_connections[user_id]
+            print(f"[WebSocket] 管理员 {user_id} 断开连接")
     except Exception as e:
         print(f"Manager WebSocket error: {e}")
-        manager_connections.discard(websocket)
+        if user_id in manager_connections:
+            manager_connections[user_id].discard(websocket)
+            if not manager_connections[user_id]:
+                del manager_connections[user_id]
         await websocket.close()
 
 
 async def notify_new_repair(repair_data: dict):
-    """通知管理员有新的报修"""
-    print(f"[WebSocket] 通知管理员新报修, 当前连接数: {len(manager_connections)}")
+    """通知所有管理员有新的报修"""
+    total_connections = sum(len(connections) for connections in manager_connections.values())
+    print(f"[WebSocket] 通知管理员新报修, 当前管理员数: {len(manager_connections)}, 总连接数: {total_connections}")
     print(f"[WebSocket] 消息: {repair_data}")
-    for websocket in manager_connections.copy():
-        try:
-            await websocket.send_json({
-                "type": "new_repair",
-                "data": repair_data
-            })
-            print(f"[WebSocket] 成功发送消息给管理员")
-        except Exception as e:
-            print(f"[WebSocket] 发送失败: {e}")
-            manager_connections.discard(websocket)
+    
+    # 遍历所有管理员的所有连接
+    for user_id, connections in list(manager_connections.items()):
+        for websocket in connections.copy():
+            try:
+                await websocket.send_json({
+                    "type": "new_repair",
+                    "data": repair_data
+                })
+                print(f"[WebSocket] 成功发送消息给管理员 {user_id}")
+            except Exception as e:
+                print(f"[WebSocket] 发送失败: {e}")
+                manager_connections[user_id].discard(websocket)
+                if not manager_connections[user_id]:
+                    del manager_connections[user_id]
 
 
 @router.websocket("/ws/owner/{user_id}")
@@ -192,3 +209,25 @@ async def notify_repair_deleted(maintenance_worker_id: int, repair_data: dict):
                 maintenance_connections[maintenance_worker_id].discard(websocket)
     else:
         print(f"[WebSocket] 维修人员 {maintenance_worker_id} 未连接")
+
+
+async def notify_manager_repair_update(repair_data: dict):
+    """通知所有管理员工单状态更新（维修人员开始/完成维修）"""
+    total_connections = sum(len(connections) for connections in manager_connections.values())
+    print(f"[WebSocket] 通知管理员工单状态更新, 当前管理员数: {len(manager_connections)}, 总连接数: {total_connections}")
+    print(f"[WebSocket] 消息: {repair_data}")
+    
+    # 遍历所有管理员的所有连接
+    for user_id, connections in list(manager_connections.items()):
+        for websocket in connections.copy():
+            try:
+                await websocket.send_json({
+                    "type": "repair_status_update",  # 复用类型，前端统一处理
+                    "data": repair_data
+                })
+                print(f"[WebSocket] 成功发送消息给管理员 {user_id}")
+            except Exception as e:
+                print(f"[WebSocket] 发送失败: {e}")
+                manager_connections[user_id].discard(websocket)
+                if not manager_connections[user_id]:
+                    del manager_connections[user_id]

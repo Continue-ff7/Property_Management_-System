@@ -179,8 +179,10 @@ async def start_repair(
     await order.save()
     
     # 通过WebSocket通知业主
-    from app.api.v1.websocket import notify_repair_status_update
+    from app.api.v1.websocket import notify_repair_status_update, notify_manager_repair_update
     property_info = f"{order.property.building.name}{order.property.unit}单元{order.property.room_number}"
+    
+    # 通知业主
     await notify_repair_status_update(order.owner_id, {
         "id": order.id,
         "order_number": order.order_number,
@@ -189,6 +191,18 @@ async def start_repair(
         "property_info": property_info,
         "maintenance_worker_name": current_user.name,
         "message": "维修人员已开始维修"
+    })
+    
+    # 通知管理员
+    await notify_manager_repair_update({
+        "id": order.id,
+        "order_number": order.order_number,
+        "status": order.status.value,
+        "started_at": order.started_at.isoformat(),
+        "property_info": property_info,
+        "maintenance_worker_name": current_user.name,
+        "owner_name": order.owner.name,
+        "message": f"维修人员{current_user.name}已开始处理工单"
     })
     
     return MessageResponse(message="已开始维修")
@@ -216,8 +230,10 @@ async def complete_repair(
     await order.save()
     
     # 通过WebSocket通知业主
-    from app.api.v1.websocket import notify_repair_status_update
+    from app.api.v1.websocket import notify_repair_status_update, notify_manager_repair_update
     property_info = f"{order.property.building.name}{order.property.unit}单元{order.property.room_number}"
+    
+    # 通知业主
     await notify_repair_status_update(order.owner_id, {
         "id": order.id,
         "order_number": order.order_number,
@@ -226,6 +242,18 @@ async def complete_repair(
         "property_info": property_info,
         "maintenance_worker_name": current_user.name,
         "message": "维修已完成，请进行评价"
+    })
+    
+    # 通知管理员
+    await notify_manager_repair_update({
+        "id": order.id,
+        "order_number": order.order_number,
+        "status": order.status.value,
+        "completed_at": order.completed_at.isoformat(),
+        "property_info": property_info,
+        "maintenance_worker_name": current_user.name,
+        "owner_name": order.owner.name,
+        "message": f"维修人员{current_user.name}已完成工单"
     })
     
     return MessageResponse(message="维修已完成")

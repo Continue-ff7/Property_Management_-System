@@ -281,6 +281,18 @@ export default {
       }
     )
     
+    // 监听Vuex中的工单状态更新通知（维修人员开始/完成维修）
+    watch(
+      () => store.state.repairStatusUpdate,
+      (newVal) => {
+        if (newVal) {
+          // 收到工单状态更新，刷新列表
+          console.log('管理员端收到工单状态更新，刷新列表')
+          loadRepairs()
+        }
+      }
+    )
+    
     return {
       loading, filterStatus, filterUrgency, repairs, pagination, workers,
       assignDialogVisible, detailDialogVisible, currentRepair, assignWorkerId, assigning,

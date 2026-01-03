@@ -24,7 +24,7 @@ export default {
       const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
       
       // 只为管理员建立WebSocket
-      if (!token || userInfo.role !== 'manager') return
+      if (!token || userInfo.role !== 'manager' || !userInfo.id) return
           
       // 如果已经有连接，先关闭旧连接
       if (ws) {
@@ -46,7 +46,8 @@ export default {
       }
           
       console.log('创建WebSocket连接...')
-      ws = new WebSocket(getWebSocketUrl(`/ws/manager?token=${token}`))
+      // 添加用户ID到URL，后端根据ID管理连接
+      ws = new WebSocket(getWebSocketUrl(`/ws/manager/${userInfo.id}?token=${token}`))
       
       ws.onopen = () => {
         console.log('管理员WebSocket连接成功')
@@ -78,6 +79,21 @@ export default {
             
             // 通过Vuex通知页面刷新
             store.dispatch('notifyNewRepair', message.data)
+          }
+          else if (message.type === 'repair_status_update') {
+            // 收到工单状态更新通知（维修人员开始/完成维修）
+            ElNotification({
+              title: '工单状态更新',
+              message: `工单号：${message.data.order_number}\n${message.data.message}`,
+              type: 'success',
+              duration: 5000,  // 5秒后自动关闭
+              onClick: () => {
+                router.push('/repairs')
+              }
+            })
+            
+            // 通过Vuex通知页面刷新
+            store.dispatch('notifyRepairStatusUpdate', message.data)
           }
         } catch (error) {
           console.error('WebSocket消息解析失败:', error)
