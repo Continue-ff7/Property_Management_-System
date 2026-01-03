@@ -94,6 +94,20 @@ export default {
             
             // 通过Vuex通知页面刷新
             store.dispatch('notifyRepairStatusUpdate', message.data)
+          } else if (message.type === 'repair_evaluated') {
+            // ✅ 新增：处理评价通知
+            ElNotification({
+              title: '工单已评价',
+              message: `工单号：${message.data.order_number}\n${message.data.message}\n评论: ${message.data.comment || '无'}`,
+              type: 'success',
+              duration: 0,  // 不自动关闭
+              onClick: () => {
+                router.push('/repairs')
+              }
+            })
+            
+            // 通过Vuex通知页面刷新
+            store.dispatch('notifyRepairStatusUpdate', message.data)
           }
         } catch (error) {
           console.error('WebSocket消息解析失败:', error)

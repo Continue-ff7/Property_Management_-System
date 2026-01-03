@@ -65,7 +65,7 @@
                   class="status-dot"
                   :class="`status-${order.status}`"
                 ></span>
-                <span class="status-text">{{ getStatusDescription(order.status) }}</span>
+                <span class="status-text">{{ getStatusDescription(order) }}</span>
               </div>
               <van-button 
                 type="primary" 
@@ -178,26 +178,23 @@ export default {
       return map[status] || '#dcdee0'
     }
     
-    const getStatusText = (status) => {
-      const map = {
-        pending: '待分配',
-        assigned: '待处理',
-        in_progress: '处理中',
-        completed: '已完成',
-        cancelled: '已取消'
+    // ✅ 简化：直接根据状态返回文本
+    const getStatusText = (order) => {
+      const statusMap = {
+        'pending': '待分配',
+        'assigned': '待处理',
+        'in_progress': '处理中',
+        'pending_payment': '待支付',
+        'pending_evaluation': '待评价',
+        'finished': '已完结',
+        'cancelled': '已取消',
+        'completed': '已完成'  // 兼容旧数据
       }
-      return map[status] || status
+      return statusMap[order.status || order] || order.status || order
     }
     
-    const getStatusDescription = (status) => {
-      const map = {
-        pending: '待分配',
-        assigned: '待处理',
-        in_progress: '处理中',
-        completed: '已完成',
-        cancelled: '已取消'
-      }
-      return map[status] || status
+    const getStatusDescription = (order) => {
+      return getStatusText(order)  // 复用相同逻辑
     }
     
     const handleAction = (order) => {

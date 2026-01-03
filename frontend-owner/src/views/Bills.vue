@@ -8,7 +8,7 @@
     />
     
     <div class="content">
-      <van-tabs v-model="activeTab" @change="loadBills">
+      <van-tabs :active="activeTab" @update:active="activeTab = $event; loadBills()">
         <van-tab title="全部"></van-tab>
         <van-tab title="未支付"></van-tab>
         <van-tab title="已支付"></van-tab>
@@ -125,7 +125,7 @@ export default {
     const paying = ref(false)
     const currentBill = ref(null)
     
-    const statusMap = ['', 'unpaid', 'paid']
+    const statusMap = ['', 'unpaid', 'paid']  // ✅ 修正：索引 0=全部, 1=未支付, 2=已支付
     
     const loadBills = async () => {
       try {

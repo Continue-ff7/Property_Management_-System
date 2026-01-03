@@ -117,6 +117,34 @@ export default {
               
               // 通过Vuex通知页面更新
               store.dispatch('notifyWorkorderDeleted', message.data)
+            } else if (message.type === 'repair_evaluated') {
+              // ✅ 新增：处理评价通知
+              const notify = showNotify({
+                type: 'success',
+                message: `工单 ${message.data.order_number}\n${message.data.message}\n评分：${message.data.rating_text}\n评论：${message.data.comment || '无'}`,
+                duration: 0,
+                onClick: () => {
+                  notify.close()
+                  router.push(`/maintenance/workorder/${message.data.id}`)
+                }
+              })
+              
+              // 通过Vuex通知页面更新
+              store.dispatch('notifyWorkorderEvaluated', message.data)
+            } else if (message.type === 'repair_cost_paid') {
+              // ✅ 新增：处理维修费用支付通知
+              const notify = showNotify({
+                type: 'success',
+                message: `工单 ${message.data.order_number}\n${message.data.message}`,
+                duration: 0,
+                onClick: () => {
+                  notify.close()
+                  router.push(`/maintenance/workorder/${message.data.order_id}`)
+                }
+              })
+              
+              // 通过Vuex通知页面更新
+              store.dispatch('notifyWorkorderStatusUpdate', message.data)
             }
           }
         } catch (error) {

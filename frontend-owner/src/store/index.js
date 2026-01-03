@@ -7,7 +7,8 @@ export default createStore({
     // WebSocket通知状态
     repairStatusUpdate: null,      // 业主：工单状态更新通知
     newWorkorder: null,            // 维修人员：新工单通知
-    workorderDeleted: null         // 维修人员：工单被删除通知
+    workorderDeleted: null,        // 维修人员：工单被删除通知
+    workorderEvaluated: null       // ✅ 新增：维修人员：工单被评价通知
   },
   
   mutations: {
@@ -39,6 +40,11 @@ export default createStore({
     
     SET_WORKORDER_DELETED(state, data) {
       state.workorderDeleted = data
+    },
+    
+    // ✅ 新增：工单评价通知
+    SET_WORKORDER_EVALUATED(state, data) {
+      state.workorderEvaluated = data
     }
   },
   
@@ -63,6 +69,11 @@ export default createStore({
     
     notifyWorkorderDeleted({ commit }, data) {
       commit('SET_WORKORDER_DELETED', data)
+    },
+    
+    // ✅ 新增：工单评价通知
+    notifyWorkorderEvaluated({ commit }, data) {
+      commit('SET_WORKORDER_EVALUATED', data)
     }
   }
 })

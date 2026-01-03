@@ -76,6 +76,13 @@ export const repairAPI = {
       params
     })
   },
+  // ✅ 新增：获取工单详情
+  getRepairDetail(repairId) {
+    return request({
+      url: `/owner/repairs/${repairId}`,
+      method: 'get'
+    })
+  },
   // 提交报修
   createRepair(data) {
     return request({
@@ -90,6 +97,13 @@ export const repairAPI = {
       url: `/owner/repairs/${repairId}/evaluate`,
       method: 'post',
       data
+    })
+  },
+  // ✅ 新增：支付维修费用
+  payRepairCost(repairId) {
+    return request({
+      url: `/owner/repairs/${repairId}/pay`,
+      method: 'post'
     })
   }
 }

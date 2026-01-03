@@ -26,6 +26,17 @@
         <el-table-column prop="owner_name" label="业主" width="100" />
         <el-table-column prop="property_info" label="房产" width="150" />
         <el-table-column prop="description" label="问题描述" show-overflow-tooltip />
+        <!-- ✅ 新增：维修费用 -->
+        <el-table-column label="维修费用" width="120">
+          <template #default="{ row }">
+            <span v-if="row.repair_cost !== null && row.repair_cost !== undefined">
+              ￥{{ row.repair_cost }}
+              <el-tag v-if="row.repair_cost > 0 && row.cost_paid" type="success" size="small" style="margin-left: 5px">已付</el-tag>
+              <el-tag v-else-if="row.repair_cost > 0 && !row.cost_paid" type="danger" size="small" style="margin-left: 5px">未付</el-tag>
+            </span>
+            <span v-else style="color: #909399">-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="紧急程度" width="100">
           <template #default="{ row }">
             <el-tag :type="getUrgencyType(row.urgency_level)">
@@ -35,8 +46,8 @@
         </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">
-              {{ getStatusText(row.status) }}
+            <el-tag :type="getStatusType(row)">
+              {{ getStatusText(row) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -95,7 +106,7 @@
     </el-dialog>
     
     <!-- 详情对话框 -->
-    <el-dialog v-model="detailDialogVisible" title="工单详情" width="600px">
+    <el-dialog v-model="detailDialogVisible" title="工单详情" width="700px">
       <el-descriptions :column="2" border v-if="currentRepair">
         <el-descriptions-item label="工单号">{{ currentRepair.order_number }}</el-descriptions-item>
         <el-descriptions-item label="业主">{{ currentRepair.owner_name }}</el-descriptions-item>
@@ -107,14 +118,35 @@
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="状态">
-          <el-tag :type="getStatusType(currentRepair.status)">
-            {{ getStatusText(currentRepair.status) }}
+          <el-tag :type="getStatusType(currentRepair)">
+            {{ getStatusText(currentRepair) }}
           </el-tag>
         </el-descriptions-item>
+        
+        <!-- ✅ 修改：支持新状态，显示维修费用 -->
+        <el-descriptions-item label="维修费用" v-if="currentRepair.status === 'pending_payment' || currentRepair.status === 'pending_evaluation' || currentRepair.status === 'finished' || currentRepair.status === 'completed'">
+          <span v-if="currentRepair.repair_cost !== null && currentRepair.repair_cost !== undefined">
+            ￥{{ currentRepair.repair_cost }}
+            <el-tag v-if="currentRepair.status === 'finished' || (currentRepair.repair_cost > 0 && currentRepair.cost_paid)" type="success" size="small" style="margin-left: 8px">已支付</el-tag>
+            <el-tag v-else-if="currentRepair.status === 'pending_payment' || (currentRepair.repair_cost > 0 && !currentRepair.cost_paid)" type="danger" size="small" style="margin-left: 8px">待支付</el-tag>
+            <el-tag v-else type="info" size="small" style="margin-left: 8px">免费维修</el-tag>
+          </span>
+          <span v-else style="color: #909399">未设置</span>
+        </el-descriptions-item>
+        
+        <!-- ✅ 新增：维修人员信息 -->
+        <el-descriptions-item label="维修人员" v-if="currentRepair.maintenance_worker_name">
+          {{ currentRepair.maintenance_worker_name }}
+        </el-descriptions-item>
+        <el-descriptions-item label="工单状态" v-else>
+          <el-tag type="info">未分配</el-tag>
+        </el-descriptions-item>
+        
         <el-descriptions-item label="问题描述" :span="2">
           {{ currentRepair.description }}
         </el-descriptions-item>
-        <el-descriptions-item label="报修图片" :span="2">
+        
+        <el-descriptions-item label="报修图片" :span="2" v-if="currentRepair.images && currentRepair.images.length > 0">
           <el-image
             v-for="(img, index) in currentRepair.images"
             :key="index"
@@ -123,6 +155,42 @@
             fit="cover"
             :preview-src-list="currentRepair.images.map(getImageUrl)"
           />
+        </el-descriptions-item>
+        
+        <!-- ✅ 新增：维修完成照片 -->
+        <el-descriptions-item label="维修完成照片" :span="2" v-if="currentRepair.repair_images && currentRepair.repair_images.length > 0">
+          <el-image
+            v-for="(img, index) in currentRepair.repair_images"
+            :key="'repair-' + index"
+            :src="getImageUrl(img)"
+            style="width: 100px; height: 100px; margin-right: 10px"
+            fit="cover"
+            :preview-src-list="currentRepair.repair_images.map(getImageUrl)"
+          />
+        </el-descriptions-item>
+        
+        <!-- ✅ 新增：时间线 -->
+        <el-descriptions-item label="提交时间" :span="2">
+          {{ formatDate(currentRepair.created_at) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="分配时间" :span="2" v-if="currentRepair.assigned_at">
+          {{ formatDate(currentRepair.assigned_at) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="开始维修时间" :span="2" v-if="currentRepair.started_at">
+          {{ formatDate(currentRepair.started_at) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="完成时间" :span="2" v-if="currentRepair.completed_at">
+          {{ formatDate(currentRepair.completed_at) }}
+        </el-descriptions-item>
+        
+        <!-- ✅ 新增：评价信息 -->
+        <el-descriptions-item label="业主评价" :span="2" v-if="currentRepair.rating">
+          <div>
+            <el-rate v-model="currentRepair.rating" disabled />
+            <p style="margin-top: 8px; color: #606266" v-if="currentRepair.comment">
+              {{ currentRepair.comment }}
+            </p>
+          </div>
         </el-descriptions-item>
       </el-descriptions>
     </el-dialog>
@@ -255,14 +323,47 @@ export default {
       return map[level] || level
     }
     
-    const getStatusType = (status) => {
-      const map = { pending: 'warning', assigned: 'primary', in_progress: 'primary', completed: 'success' }
-      return map[status] || 'info'
+    // ✅ 简化：直接根据状态返回类型
+    const getStatusType = (repair) => {
+      const statusMap = {
+        'pending': 'warning',
+        'assigned': 'primary',
+        'in_progress': 'primary',
+        'pending_payment': 'danger',
+        'pending_evaluation': 'primary',
+        'finished': 'success',
+        'cancelled': 'info',
+        'completed': 'success'  // 兼容旧数据
+      }
+      return statusMap[repair.status || repair] || 'info'
     }
     
-    const getStatusText = (status) => {
-      const map = { pending: '待处理', assigned: '已分配', in_progress: '维修中', completed: '已完成' }
-      return map[status] || status
+    // ✅ 简化：直接根据状态返回文本
+    const getStatusText = (repair) => {
+      const statusMap = {
+        'pending': '待处理',
+        'assigned': '已分配',
+        'in_progress': '维修中',
+        'pending_payment': '待支付',
+        'pending_evaluation': '待评价',
+        'finished': '已完结',
+        'cancelled': '已取消',
+        'completed': '已完成'  // 兼容旧数据
+      }
+      return statusMap[repair.status || repair] || repair.status || repair
+    }
+    
+    // ✅ 新增：格式化日期时间
+    const formatDate = (dateStr) => {
+      if (!dateStr) return '-'
+      const date = new Date(dateStr)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hour = String(date.getHours()).padStart(2, '0')
+      const minute = String(date.getMinutes()).padStart(2, '0')
+      const second = String(date.getSeconds()).padStart(2, '0')
+      return `${year}-${month}-${day} ${hour}:${minute}:${second}`
     }
     
     onMounted(() => {
@@ -297,7 +398,7 @@ export default {
       loading, filterStatus, filterUrgency, repairs, pagination, workers,
       assignDialogVisible, detailDialogVisible, currentRepair, assignWorkerId, assigning,
       loadRepairs, handlePageChange, showAssignDialog, handleAssign, handleDelete, viewDetail,
-      getImageUrl, getUrgencyType, getUrgencyText, getStatusType, getStatusText
+      getImageUrl, getUrgencyType, getUrgencyText, getStatusType, getStatusText, formatDate
     }
   }
 }

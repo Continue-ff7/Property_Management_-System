@@ -231,3 +231,38 @@ async def notify_manager_repair_update(repair_data: dict):
                 manager_connections[user_id].discard(websocket)
                 if not manager_connections[user_id]:
                     del manager_connections[user_id]
+
+
+async def notify_repair_evaluation(order_id: int, maintenance_worker_id: int, evaluation_data: dict):
+    """通知维修人员和管理员：业主已评价"""
+    print(f"[WebSocket] 发送评价通知, 工单ID: {order_id}, 维修人员ID: {maintenance_worker_id}")
+    
+    # 1. 通知维修人员
+    if maintenance_worker_id and maintenance_worker_id in maintenance_connections:
+        for websocket in maintenance_connections[maintenance_worker_id].copy():
+            try:
+                await websocket.send_json({
+                    "type": "repair_evaluated",  # 新的消息类型
+                    "data": evaluation_data
+                })
+                print(f"[WebSocket] 已通知维修人员 {maintenance_worker_id}")
+            except Exception as e:
+                print(f"[WebSocket] 通知维修人员失败: {e}")
+                maintenance_connections[maintenance_worker_id].discard(websocket)
+    
+    # 2. 通知所有管理员
+    total_managers = len(manager_connections)
+    for user_id, connections in list(manager_connections.items()):
+        for websocket in connections.copy():
+            try:
+                await websocket.send_json({
+                    "type": "repair_evaluated",  # 同样的消息类型
+                    "data": evaluation_data
+                })
+            except Exception as e:
+                print(f"[WebSocket] 通知管理员失败: {e}")
+                manager_connections[user_id].discard(websocket)
+                if not manager_connections[user_id]:
+                    del manager_connections[user_id]
+    
+    print(f"[WebSocket] 评价通知完成, 已通知 {total_managers} 个管理员")

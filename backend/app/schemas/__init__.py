@@ -253,6 +253,10 @@ class RepairOrderResponse(BaseModel):
     repair_images: List[str]
     rating: Optional[int]
     comment: Optional[str]
+    # ✅ 新增：维修费用相关字段
+    repair_cost: Optional[float] = None
+    cost_paid: bool = False
+    paid_at: Optional[datetime] = None
     created_at: datetime
     
     class Config:

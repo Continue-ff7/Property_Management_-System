@@ -101,7 +101,10 @@ class RepairStatus(str, Enum):
     PENDING = "pending"  # 待处理
     ASSIGNED = "assigned"  # 已分配
     IN_PROGRESS = "in_progress"  # 维修中
-    COMPLETED = "completed"  # 已完成
+    COMPLETED = "completed"  # 已完成（临时状态，会自动转为待支付/待评价）
+    PENDING_PAYMENT = "pending_payment"  # ✅ 待支付
+    PENDING_EVALUATION = "pending_evaluation"  # ✅ 待评价
+    FINISHED = "finished"  # ✅ 已完结
     CANCELLED = "cancelled"  # 已取消
 
 
@@ -120,6 +123,12 @@ class RepairOrder(Model):
     started_at = fields.DatetimeField(null=True, description="开始时间")
     completed_at = fields.DatetimeField(null=True, description="完成时间")
     repair_images = fields.JSONField(default=list, description="维修现场图片")
+    
+    # ✅ 新增：维修费用相关字段
+    repair_cost = fields.DecimalField(max_digits=10, decimal_places=2, null=True, description="维修费用")
+    cost_paid = fields.BooleanField(default=False, description="费用是否已支付")
+    paid_at = fields.DatetimeField(null=True, description="支付时间")
+    
     rating = fields.IntField(null=True, description="评分（1-5）")
     comment = fields.TextField(null=True, description="评价")
     created_at = fields.DatetimeField(auto_now_add=True)

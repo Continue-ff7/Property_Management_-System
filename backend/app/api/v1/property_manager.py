@@ -583,14 +583,12 @@ async def delete_bill(
     bill_id: int,
     current_user: User = Depends(get_current_manager)
 ):
-    """删除账单（仅允许删除未支付的账单）"""
+    """删除账单（允许删除任何状态的账单）"""
     bill = await Bill.get_or_none(id=bill_id)
     if not bill:
         raise HTTPException(status_code=404, detail="账单不存在")
     
-    if bill.status != BillStatus.UNPAID:
-        raise HTTPException(status_code=400, detail="只能删除未支付的账单")
-    
+    # ✅ 移除限制：允许删除已支付的账单
     await bill.delete()
     return MessageResponse(message="账单已删除")
 
@@ -637,6 +635,10 @@ async def get_all_repair_orders(
             "repair_images": order.repair_images,
             "rating": order.rating,
             "comment": order.comment,
+            # ✅ 新增：维修费用相关字段
+            "repair_cost": float(order.repair_cost) if order.repair_cost else None,
+            "cost_paid": order.cost_paid,
+            "paid_at": order.paid_at,
             "created_at": order.created_at,
             "owner_name": order.owner.name,
             "owner_phone": order.owner.phone,

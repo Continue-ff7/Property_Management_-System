@@ -114,17 +114,30 @@ async def get_my_bills(
     """获取个人缴费记录和账单"""
     query = Bill.filter(owner_id=current_user.id)
     
+    # ✅ 添加调试日志
+    print(f"\n账单查询 - 用户ID: {current_user.id}, status参数: {status}")
+    
     # 如果有status参数，过滤状态
     if status:
         # 将字符串转换为BillStatus枚举
         try:
             bill_status = BillStatus(status)
             query = query.filter(status=bill_status)
+            print(f"✅ 已过滤状态: {bill_status}")
         except ValueError:
             # 如果传入的status不合法，忽略过滤条件
+            print(f"❌ status不合法: {status}")
             pass
+    else:
+        print("ℹ️ 未传status参数，返回全部账单")
     
     bills = await query.order_by("-created_at").offset(skip).limit(limit).prefetch_related("property", "property__building")
+    
+    # ✅ 日志：显示查询结果
+    print(f"✅ 查询到 {len(bills)} 条账单")
+    if bills:
+        for bill in bills[:3]:  # 只显示前3条
+            print(f"  - 账单ID: {bill.id}, 状态: {bill.status.value}, 金额: {bill.amount}")
     
     result = []
     for bill in bills:
@@ -705,16 +718,67 @@ async def get_my_repair_orders(
             "repair_images": order.repair_images,
             "rating": order.rating,
             "comment": order.comment,
+            # ✅ 新增：维修费用相关字段（转换为float避免序列化问题）
+            "repair_cost": float(order.repair_cost) if order.repair_cost else None,
+            "cost_paid": order.cost_paid,
+            "paid_at": order.paid_at,
             "created_at": order.created_at,
             "owner_name": current_user.name,
             "owner_phone": current_user.phone,
-            "owner_avatar": current_user.avatar,  # 添加业主头像
+            "owner_avatar": current_user.avatar,
             "property_info": property_info,
             "maintenance_worker_name": maintenance_worker_name,
-            "maintenance_worker_avatar": maintenance_worker_avatar  # 添加维修人员头像
+            "maintenance_worker_avatar": maintenance_worker_avatar
         })
     
     return result
+
+
+@router.get("/repairs/{order_id}", response_model=RepairOrderWithDetails)
+async def get_repair_detail(
+    order_id: int,
+    current_user: User = Depends(get_current_owner)
+):
+    """获取单个工单详情"""
+    order = await RepairOrder.get_or_none(id=order_id, owner_id=current_user.id).prefetch_related(
+        "property", "property__building", "maintenance_worker"
+    )
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="工单不存在")
+    
+    property_info = f"{order.property.building.name}{order.property.unit}单元{order.property.room_number}"
+    maintenance_worker_name = order.maintenance_worker.name if order.maintenance_worker else None
+    maintenance_worker_avatar = order.maintenance_worker.avatar if order.maintenance_worker else None
+    
+    return {
+        "id": order.id,
+        "order_number": order.order_number,
+        "owner_id": order.owner_id,
+        "property_id": order.property_id,
+        "description": order.description,
+        "images": order.images,
+        "urgency_level": order.urgency_level.value,
+        "status": order.status.value,
+        "maintenance_worker_id": order.maintenance_worker_id,
+        "assigned_at": order.assigned_at,
+        "started_at": order.started_at,
+        "completed_at": order.completed_at,
+        "repair_images": order.repair_images,
+        "rating": order.rating,
+        "comment": order.comment,
+        # ✅ 新增：维修费用相关字段
+        "repair_cost": float(order.repair_cost) if order.repair_cost else None,
+        "cost_paid": order.cost_paid,
+        "paid_at": order.paid_at,
+        "created_at": order.created_at,
+        "owner_name": current_user.name,
+        "owner_phone": current_user.phone,
+        "owner_avatar": current_user.avatar,
+        "property_info": property_info,
+        "maintenance_worker_name": maintenance_worker_name,
+        "maintenance_worker_avatar": maintenance_worker_avatar
+    }
 
 
 @router.post("/repairs/{order_id}/evaluate", response_model=MessageResponse)
@@ -724,13 +788,16 @@ async def evaluate_repair_order(
     current_user: User = Depends(get_current_owner)
 ):
     """对完成的维修进行评价与确认"""
-    order = await RepairOrder.get_or_none(id=order_id, owner_id=current_user.id)
+    order = await RepairOrder.get_or_none(id=order_id, owner_id=current_user.id).prefetch_related(
+        "property", "property__building", "maintenance_worker"
+    )
     
     if not order:
         raise HTTPException(status_code=404, detail="工单不存在")
     
-    if order.status != RepairStatus.COMPLETED:
-        raise HTTPException(status_code=400, detail="只能对已完成的工单进行评价")
+    # ✅ 修改：状态应该是 pending_evaluation
+    if order.status != RepairStatus.PENDING_EVALUATION:
+        raise HTTPException(status_code=400, detail="工单不是待评价状态")
     
     if order.rating is not None:
         raise HTTPException(status_code=400, detail="该工单已评价")
@@ -740,9 +807,69 @@ async def evaluate_repair_order(
     
     order.rating = evaluation.rating
     order.comment = evaluation.comment
+    order.status = RepairStatus.FINISHED  # ✅ 评价后自动改为已完结
     await order.save()
     
+    print(f"✅ 业主 {current_user.name} 评价工单: {evaluation.rating}分，状态改为已完结")
+    
+    # ✅ 新增：通过WebSocket通知维修人员和管理员
+    from app.api.v1.websocket import notify_repair_evaluation
+    property_info = f"{order.property.building.name}{order.property.unit}单元{order.property.room_number}"
+    
+    # 获取评分星级文字
+    rating_text = "⭐" * evaluation.rating
+    
+    evaluation_data = {
+        "id": order.id,
+        "order_number": order.order_number,
+        "property_info": property_info,
+        "owner_name": current_user.name,
+        "maintenance_worker_name": order.maintenance_worker.name if order.maintenance_worker else None,
+        "rating": evaluation.rating,
+        "rating_text": rating_text,
+        "comment": evaluation.comment,
+        "message": f"业主已评价: {rating_text} {evaluation.rating}分"
+    }
+    
+    await notify_repair_evaluation(
+        order_id=order.id,
+        maintenance_worker_id=order.maintenance_worker_id,
+        evaluation_data=evaluation_data
+    )
+    
     return MessageResponse(message="评价成功")
+
+
+@router.post("/repairs/{order_id}/pay", response_model=MessageResponse)
+async def pay_repair_cost(
+    order_id: int,
+    current_user: User = Depends(get_current_owner)
+):
+    """支付维修费用（复用账单支付逻辑）"""
+    order = await RepairOrder.get_or_none(id=order_id, owner_id=current_user.id)
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="工单不存在")
+    
+    # ✅ 修改：状态应该是 pending_payment
+    if order.status != RepairStatus.PENDING_PAYMENT:
+        raise HTTPException(status_code=400, detail="工单不是待支付状态")
+    
+    if not order.repair_cost or order.repair_cost <= 0:
+        raise HTTPException(status_code=400, detail="该工单无需支付费用")
+    
+    if order.cost_paid:
+        raise HTTPException(status_code=400, detail="费用已支付")
+    
+    # ✅ 模拟支付成功（实际应该集成支付宝/微信支付）
+    order.cost_paid = True
+    order.paid_at = datetime.now()
+    order.status = RepairStatus.PENDING_EVALUATION  # ✅ 支付后自动改为待评价
+    await order.save()
+    
+    print(f"✅ 业主 {current_user.name} 支付维修费用: ￥{order.repair_cost}，状态改为待评价")
+    
+    return MessageResponse(message="支付成功")
 
 
 @router.post("/chat", response_model=ChatResponse)

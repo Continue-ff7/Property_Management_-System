@@ -31,6 +31,13 @@ class UpdateProfileRequest(BaseModel):
     avatar: Optional[str] = None  # 头像URL
 
 
+class CompleteRepairRequest(BaseModel):
+    """完成维修请求模型"""
+    repair_images: Optional[List[str]] = []  # 维修完成照片列表
+    repair_cost: Optional[float] = None  # ✅ 新增：维修费用
+    note: Optional[str] = None  # 备注（预留）
+
+
 @router.put("/profile")
 async def update_profile(
     update_data: UpdateProfileRequest,
@@ -211,6 +218,7 @@ async def start_repair(
 @router.post("/orders/{order_id}/complete", response_model=MessageResponse)
 async def complete_repair(
     order_id: int,
+    request_data: CompleteRepairRequest,  # ✅ 使用Pydantic模型接收数据
     current_user: User = Depends(get_current_maintenance)
 ):
     """完成维修"""
@@ -225,8 +233,26 @@ async def complete_repair(
     if order.status != RepairStatus.IN_PROGRESS:
         raise HTTPException(status_code=400, detail="工单未在维修中")
     
-    order.status = RepairStatus.COMPLETED
     order.completed_at = datetime.now()
+    
+    # 保存维修完成照片
+    if request_data.repair_images:
+        order.repair_images = request_data.repair_images
+        print(f"✅ 保存维修完成照片: {len(request_data.repair_images)} 张")
+    
+    # ✅ 修改：根据费用自动设置状态
+    if request_data.repair_cost is not None and request_data.repair_cost > 0:
+        from decimal import Decimal
+        order.repair_cost = Decimal(str(request_data.repair_cost))
+        order.cost_paid = False  # 默认未支付
+        order.status = RepairStatus.PENDING_PAYMENT  # ✅ 待支付
+        print(f"✅ 设置维修费用: ￥{request_data.repair_cost}，状态: 待支付")
+    else:
+        # 无费用或费用为0，直接进入待评价
+        order.repair_cost = None
+        order.status = RepairStatus.PENDING_EVALUATION  # ✅ 待评价
+        print(f"✅ 免费维修，状态: 待评价")
+    
     await order.save()
     
     # 通过WebSocket通知业主

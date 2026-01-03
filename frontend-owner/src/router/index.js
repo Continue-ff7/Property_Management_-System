@@ -52,6 +52,13 @@ const routes = [
     component: () => import('@/views/RepairDetail.vue'),
     meta: { title: '维修详情', role: 'owner' }
   },
+  // ✅ 新增：维修费用支付页面
+  {
+    path: '/repair/:id/payment',
+    name: 'RepairPayment',
+    component: () => import('@/views/RepairPayment.vue'),
+    meta: { title: '支付维修费用', role: 'owner' }
+  },
   {
     path: '/repair/:id/chat',
     name: 'RepairChat',

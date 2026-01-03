@@ -86,7 +86,24 @@
                 />
               </div>
             </div>
-            <p class="desc" v-if="repair.status === 'completed' && !repair.rating">维修已完成，请评价服务质量</p>
+            
+            <!-- ✅ 新增：始终显示维修费用，包括0元 -->
+            <div v-if="repair.status === 'pending_payment' || repair.status === 'pending_evaluation' || repair.status === 'finished'" class="repair-cost-info">
+              <p class="desc">
+                维修费用：
+                <span class="cost-amount">
+                  ￥{{ repair.repair_cost !== null && repair.repair_cost !== undefined ? repair.repair_cost : '0.00' }}
+                </span>
+              </p>
+              <van-tag v-if="repair.status === 'finished'" type="success">已完结</van-tag>
+              <van-tag v-else-if="repair.status === 'pending_payment'" type="danger">待支付</van-tag>
+              <van-tag v-else-if="repair.status === 'pending_evaluation' && repair.repair_cost > 0" type="success">已支付</van-tag>
+              <van-tag v-else type="default">免费维修</van-tag>
+            </div>
+            
+            <p class="desc" v-if="repair.status === 'completed' && !repair.rating">
+              {{ repair.repair_cost > 0 && !repair.cost_paid ? '请先支付费用，再进行评价' : '维修已完成，请评价服务质量' }}
+            </p>
           </van-step>
           <van-step>
             <h3>{{ repair.rating ? '已评价' : '待评价' }}</h3>
@@ -124,8 +141,23 @@
       </div>
       
       <!-- 评价区域 -->
-      <div class="eval-card" v-if="repair.status === 'completed' && !repair.rating">
-        <van-button type="primary" block @click="showEvalDialog = true">
+      <!-- ✅ 简化：状态 = pending_payment 显示支付按钮，状态 = pending_evaluation 显示评价按钮 -->
+      <div class="eval-card" v-if="repair.status === 'pending_payment'">
+        <van-button 
+          type="primary" 
+          block 
+          @click="goToPayment"
+        >
+          支付并评价 ￥{{ repair.repair_cost }}
+        </van-button>
+      </div>
+      
+      <div class="eval-card" v-if="repair.status === 'pending_evaluation'">
+        <van-button 
+          type="primary" 
+          block 
+          @click="showEvalDialog = true"
+        >
           评价维修服务
         </van-button>
       </div>
@@ -276,24 +308,39 @@ export default {
       router.push(`/repair/${repair.value.id}/chat`)
     }
     
-    const getStatusType = (status) => {
-      const map = {
-        pending: 'default',
-        assigned: 'primary',
-        in_progress: 'warning',
-        completed: 'success'
-      }
-      return map[status] || 'default'
+    // ✅ 新增：跳转到支付页面
+    const goToPayment = () => {
+      router.push(`/repair/${repair.value.id}/payment`)
     }
     
-    const getStatusText = (status) => {
-      const map = {
-        pending: '待处理',
-        assigned: '已分配',
-        in_progress: '处理中',
-        completed: '已完成'
+    // ✅ 简化：直接根据状态返回类型
+    const getStatusType = (status) => {
+      const statusMap = {
+        'pending': 'default',
+        'assigned': 'default',
+        'in_progress': 'warning',
+        'pending_payment': 'danger',
+        'pending_evaluation': 'primary',
+        'finished': 'success',
+        'cancelled': 'default',
+        'completed': 'success'  // 兼容旧数据
       }
-      return map[status] || status
+      return statusMap[status] || 'default'
+    }
+    
+    // ✅ 简化：直接根据状态返回文本
+    const getStatusText = (status) => {
+      const statusMap = {
+        'pending': '待处理',
+        'assigned': '已分配',
+        'in_progress': '维修中',
+        'pending_payment': '待支付',
+        'pending_evaluation': '待评价',
+        'finished': '已完结',
+        'cancelled': '已取消',
+        'completed': '已完成'  // 兼容旧数据
+      }
+      return statusMap[status] || status
     }
     
     const getUrgencyType = (level) => {
@@ -347,6 +394,7 @@ export default {
       evalForm,
       getProgressStep,
       submitEval,
+      goToPayment,  // ✅ 新增
       previewImages,
       goToChat,
       getStatusType,
@@ -503,5 +551,28 @@ export default {
   margin-top: 8px;
   color: #646566;
   line-height: 1.5;
+}
+
+/* ✅ 新增：维修费用样式 */
+.repair-cost-info {
+  margin-top: 12px;
+  padding: 12px;
+  background: #fff7e6;
+  border-radius: 8px;
+  border: 1px solid #ffe7ba;
+}
+
+.repair-cost-info .desc {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.cost-amount {
+  font-size: 20px;
+  font-weight: bold;
+  color: #ee0a24;
+  margin: 0 8px;
 }
 </style>

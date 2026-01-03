@@ -24,8 +24,8 @@
           <div v-for="repair in repairs" :key="repair.id" class="repair-card" @click="goToDetail(repair.id)">
             <div class="card-header">
               <span class="order-number">#{{ repair.order_number }}</span>
-              <van-tag :type="getStatusType(repair.status)">
-                {{ getStatusText(repair.status) }}
+              <van-tag :type="getStatusType(repair)">
+                {{ getStatusText(repair) }}
               </van-tag>
             </div>
             
@@ -193,24 +193,34 @@ export default {
       })
     }
     
-    const getStatusType = (status) => {
-      const map = {
-        pending: 'default',
-        assigned: 'primary',
-        in_progress: 'warning',
-        completed: 'success'
+    // ✅ 简化：直接根据状态返回类型
+    const getStatusType = (repair) => {
+      const statusMap = {
+        'pending': 'default',
+        'assigned': 'default',
+        'in_progress': 'warning',
+        'pending_payment': 'danger',      // ✅ 待支付 - 红色
+        'pending_evaluation': 'primary',  // ✅ 待评价 - 蓝色
+        'finished': 'success',            // ✅ 已完结 - 绿色
+        'cancelled': 'default',
+        'completed': 'success'  // 兼容旧数据
       }
-      return map[status] || 'default'
+      return statusMap[repair.status] || 'default'
     }
     
-    const getStatusText = (status) => {
-      const map = {
-        pending: '待处理',
-        assigned: '已分配',
-        in_progress: '处理中',
-        completed: '已完成'
+    // ✅ 简化：直接根据状态返回文本
+    const getStatusText = (repair) => {
+      const statusMap = {
+        'pending': '待处理',
+        'assigned': '已分配',
+        'in_progress': '维修中',
+        'pending_payment': '待支付',      // ✅ 新状态
+        'pending_evaluation': '待评价',  // ✅ 新状态
+        'finished': '已完结',            // ✅ 新状态
+        'cancelled': '已取消',
+        'completed': '已完成'  // 兼容旧数据
       }
-      return map[status] || status
+      return statusMap[repair.status] || repair.status
     }
     
     const getUrgencyType = (level) => {

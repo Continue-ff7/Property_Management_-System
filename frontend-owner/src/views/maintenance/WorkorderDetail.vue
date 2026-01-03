@@ -17,7 +17,7 @@
             :class="`status-${workorder.status}`"
           >
             <span class="status-dot"></span>
-            {{ getStatusText(workorder.status) }}
+            {{ getStatusText(workorder) }}
           </div>
         </div>
         
@@ -114,13 +114,22 @@
       </div>
       
       <!-- 维修完成信息 -->
-      <div class="complete-card" v-if="workorder.status === 'completed'">
+      <div class="complete-card" v-if="workorder.status === 'completed' || workorder.status === 'pending_payment' || workorder.status === 'pending_evaluation' || workorder.status === 'finished'">
         <div class="card-title">
           <van-icon name="success" />
           <span>维修完成</span>
         </div>
         
         <van-cell title="完成时间" :value="formatDate(workorder.completed_at)" />
+        
+        <!-- 维修费用 -->
+        <van-cell v-if="workorder.repair_cost && workorder.repair_cost > 0" title="维修费用">
+          <template #value>
+            <span style="color: #ff6b6b; font-weight: bold;">￥{{ workorder.repair_cost }}</span>
+            <van-tag v-if="workorder.cost_paid" type="success" style="margin-left: 8px;">已支付</van-tag>
+            <van-tag v-else type="warning" style="margin-left: 8px;">未支付</van-tag>
+          </template>
+        </van-cell>
         
         <!-- 维修完成图片 -->
         <div class="images-section" v-if="workorder.repair_images && workorder.repair_images.length > 0">
@@ -136,6 +145,34 @@
               @click="previewImages(workorder.repair_images.map(i => getImageUrl(i)), index)"
             />
           </div>
+        </div>
+      </div>
+      
+      <!-- ✅ 业主评价信息 -->
+      <div class="evaluation-card" v-if="workorder.rating && (workorder.status === 'finished' || workorder.status === 'pending_evaluation')">
+        <div class="card-title">
+          <van-icon name="star" color="#ee0a24" />
+          <span>业主评价</span>
+        </div>
+        
+        <!-- 评分 -->
+        <div class="rating-section">
+          <van-rate
+            v-model="workorder.rating"
+            :readonly="true"
+            :size="24"
+            void-color="#eee"
+          />
+          <span class="rating-score">{{ workorder.rating }}.0 分</span>
+        </div>
+        
+        <!-- 评论内容 -->
+        <div class="comment-section" v-if="workorder.comment">
+          <div class="comment-label">评论内容：</div>
+          <div class="comment-text">{{ workorder.comment }}</div>
+        </div>
+        <div class="comment-section" v-else>
+          <div class="comment-text" style="color: #969799;">业主未填写评论</div>
         </div>
       </div>
     </div>
@@ -305,25 +342,34 @@ export default {
       })
     }
     
-    const getStatusType = (status) => {
-      const map = {
-        pending: 'default',
-        assigned: 'primary',
-        in_progress: 'warning',
-        completed: 'success'
+    // ✅ 简化：直接根据状态返回类型
+    const getStatusType = (order) => {
+      const statusMap = {
+        'pending': 'default',
+        'assigned': 'primary',
+        'in_progress': 'warning',
+        'pending_payment': 'danger',
+        'pending_evaluation': 'primary',
+        'finished': 'success',
+        'cancelled': 'default',
+        'completed': 'success'  // 兼容旧数据
       }
-      return map[status] || 'default'
+      return statusMap[order.status || order] || 'default'
     }
-    
-    const getStatusText = (status) => {
-      const map = {
-        pending: '待分配',
-        assigned: '待处理',
-        in_progress: '处理中',
-        completed: '已完成',
-        cancelled: '已取消'
+        
+    // ✅ 简化：直接根据状态返回文本
+    const getStatusText = (order) => {
+      const statusMap = {
+        'pending': '待分配',
+        'assigned': '待处理',
+        'in_progress': '处理中',
+        'pending_payment': '待支付',
+        'pending_evaluation': '待评价',
+        'finished': '已完结',
+        'cancelled': '已取消',
+        'completed': '已完成'  // 兼容旧数据
       }
-      return map[status] || status
+      return statusMap[order.status || order] || order.status || order
     }
     
     const getUrgencyType = (level) => {
@@ -393,6 +439,34 @@ export default {
       }
     )
     
+    // ✅ 监听评价通知，自动刷新详情
+    watch(
+      () => store.state.workorderEvaluated,
+      (newVal) => {
+        if (newVal) {
+          const currentWorkorderId = parseInt(route.params.id)
+          if (newVal.id === currentWorkorderId) {
+            console.log('当前工单已被评价，刷新详情')
+            loadDetail()
+          }
+        }
+      }
+    )
+    
+    // ✅ 监听支付通知，自动刷新详情
+    watch(
+      () => store.state.workorderStatusUpdate,
+      (newVal) => {
+        if (newVal) {
+          const currentWorkorderId = parseInt(route.params.id)
+          if (newVal.order_id === currentWorkorderId) {
+            console.log('当前工单费用已支付，刷新详情')
+            loadDetail()
+          }
+        }
+      }
+    )
+    
     onUnmounted(() => {
       if (ws) {
         ws.close()
@@ -437,7 +511,8 @@ export default {
 .info-card,
 .contact-card,
 .action-card,
-.complete-card {
+.complete-card,
+.evaluation-card {
   background: white;
   margin: 12px 16px;
   border-radius: 8px;
@@ -659,5 +734,50 @@ export default {
 
 .chat-input .van-field {
   flex: 1;
+}
+
+/* ✅ 评价卡片样式 */
+.evaluation-card {
+  background: white;
+  border: 1px solid #f2f3f5;
+}
+
+.evaluation-card .card-title {
+  color: #ee0a24;
+}
+
+.rating-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid #f2f3f5;
+}
+
+.rating-score {
+  font-size: 18px;
+  font-weight: bold;
+  color: #ee0a24;
+}
+
+.comment-section {
+  padding: 16px 0;
+}
+
+.comment-label {
+  font-size: 14px;
+  color: #646566;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.comment-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #323233;
+  padding: 12px;
+  background: #f7f8fa;
+  border-radius: 6px;
+  border-left: 3px solid #ee0a24;
 }
 </style>
