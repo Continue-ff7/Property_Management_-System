@@ -72,6 +72,18 @@ const routes = [
     meta: { title: '公告通知', role: 'owner' }
   },
   {
+    path: '/invoices',
+    name: 'Invoices',
+    component: () => import('@/views/Invoices.vue'),
+    meta: { title: '发票下载', role: 'owner' }
+  },
+  {
+    path: '/invoice-verify',
+    name: 'InvoiceVerify',
+    component: () => import('@/views/InvoiceVerify.vue'),
+    meta: { title: '发票验证' }
+  },
+  {
     path: '/ai-assistant',
     name: 'AIAssistant',
     component: () => import('@/views/AIAssistant.vue'),
@@ -101,6 +113,20 @@ const routes = [
     name: 'MaintenanceProfile',
     component: () => import('@/views/maintenance/Profile.vue'),
     meta: { title: '个人中心', requiresAuth: true, role: 'maintenance' }
+  },
+  // ✅ 新增：维修人员端今日任务
+  {
+    path: '/maintenance/today',
+    name: 'MaintenanceToday',
+    component: () => import('@/views/maintenance/Today.vue'),
+    meta: { title: '今日任务', requiresAuth: true, role: 'maintenance' }
+  },
+  // ✅ 新增：维修人员端通知中心
+  {
+    path: '/maintenance/notifications',
+    name: 'MaintenanceNotifications',
+    component: () => import('@/views/maintenance/Notifications.vue'),
+    meta: { title: '通知中心', requiresAuth: true, role: 'maintenance' }
   },
   // 维修人员端聊天
   {

@@ -160,6 +160,10 @@ export const maintenanceWorkorderAPI = {
       method: 'post'
     })
   },
+  // 别名：开始处理工单
+  startWorkorder(id) {
+    return this.startWork(id)
+  },
   // 完成维修
   completeWork(id, data) {
     return request({

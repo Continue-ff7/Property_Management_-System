@@ -1,4 +1,5 @@
 import { createStore } from 'vuex'
+import { maintenanceWorkorderAPI } from '@/api'
 
 export default createStore({
   state: {
@@ -8,7 +9,12 @@ export default createStore({
     repairStatusUpdate: null,      // 业主：工单状态更新通知
     newWorkorder: null,            // 维修人员：新工单通知
     workorderDeleted: null,        // 维修人员：工单被删除通知
-    workorderEvaluated: null       // ✅ 新增：维修人员：工单被评价通知
+    workorderEvaluated: null,      // ✅ 新增：维修人员：工单被评价通知
+    workorderStatusUpdate: null,   // ✅ 新增：维修工单状态更新（用于维修人员端自动刷新）
+    // ✅ 新增：维修人员统计数据
+    maintenanceStats: null,
+    // ✅ 新增：是否有新通知
+    hasNewNotification: false
   },
   
   mutations: {
@@ -45,6 +51,21 @@ export default createStore({
     // ✅ 新增：工单评价通知
     SET_WORKORDER_EVALUATED(state, data) {
       state.workorderEvaluated = data
+    },
+    
+    // ✅ 新增：工单状态更新（支付通知）
+    SET_WORKORDER_STATUS_UPDATE(state, data) {
+      state.workorderStatusUpdate = data
+    },
+    
+    // ✅ 新增：设置维修人员统计数据
+    SET_MAINTENANCE_STATS(state, stats) {
+      state.maintenanceStats = stats
+    },
+    
+    // ✅ 新增：设置新通知状态
+    SET_HAS_NEW_NOTIFICATION(state, hasNew) {
+      state.hasNewNotification = hasNew
     }
   },
   
@@ -74,6 +95,18 @@ export default createStore({
     // ✅ 新增：工单评价通知
     notifyWorkorderEvaluated({ commit }, data) {
       commit('SET_WORKORDER_EVALUATED', data)
+    },
+    
+    // ✅ 新增：加载维修人员统计数据
+    async loadMaintenanceStats({ commit, state }) {
+      if (state.userInfo.role === 'maintenance') {
+        try {
+          const stats = await maintenanceWorkorderAPI.getStatistics()
+          commit('SET_MAINTENANCE_STATS', stats)
+        } catch (error) {
+          console.error('加载统计数据失败:', error)
+        }
+      }
     }
   }
 })

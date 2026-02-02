@@ -473,7 +473,9 @@ export default {
                   })
                 }
                 
+                // 等待 DOM 更新后滚动到底部
                 await nextTick()
+                await nextTick() // 双重 nextTick 确保渲染完成
                 scrollToBottom()
               }
             } catch (e) {
@@ -582,7 +584,10 @@ export default {
     // 滚动到底部
     const scrollToBottom = () => {
       if (chatContainer.value) {
-        chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+        // 使用 setTimeout 确保 DOM 完全更新后再滚动
+        setTimeout(() => {
+          chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+        }, 0)
       }
     }
 
@@ -617,7 +622,7 @@ export default {
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-  padding-bottom: 80px;
+  padding-bottom: 120px; /* 增加底部留白，防止被输入框遮挡 */
 }
 
 .message-list {
@@ -750,7 +755,7 @@ export default {
   background: white;
   padding: 16px;
   border-top: 1px solid #ebedf0;
-  margin-bottom: 60px;
+  margin-bottom: 70px; /* 增加底部留白，预留输入框高度 */
 }
 
 .quick-title {

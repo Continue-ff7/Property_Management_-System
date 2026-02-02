@@ -40,7 +40,7 @@
         <van-icon name="add-o" size="28" color="#909399" />
         <span>报修申请</span>
       </div>
-      <div class="menu-item" @click="goTo('/bills?tab=paid')">
+      <div class="menu-item" @click="goTo('/invoices')">
         <van-icon name="description" size="28" color="#67c23a" />
         <span>发票下载</span>
       </div>
@@ -48,9 +48,9 @@
         <van-icon name="chat-o" size="28" color="#1989fa" />
         <span>AI助手</span>
       </div>
-      <div class="menu-item">
+      <div class="menu-item" @click="goTo('/profile')">
         <van-icon name="setting-o" size="28" color="#a0a0a0" />
-        <span>系统设置</span>
+        <span>用户设置</span>
       </div>
     </div>
     

@@ -87,11 +87,11 @@
       <van-tabbar-item to="/maintenance/workorders" icon="orders-o">
         工单
       </van-tabbar-item>
-      <van-tabbar-item to="/maintenance/tasks" icon="todo-list-o">
-        任务
+      <van-tabbar-item to="/maintenance/today" icon="calendar-o" :badge="todayCount > 0 ? todayCount : ''">
+        今日
       </van-tabbar-item>
-      <van-tabbar-item to="/maintenance/messages" icon="chat-o">
-        消息
+      <van-tabbar-item to="/maintenance/notifications" icon="bell" :dot="hasNewNotification">
+        通知
       </van-tabbar-item>
       <van-tabbar-item to="/maintenance/profile" icon="user-o">
         我的
@@ -125,6 +125,12 @@ export default {
       in_progress: 0,
       completed: 0
     })
+    
+    // ✅ 新增：今日待办数量（从 Vuex 获取）
+    const todayCount = computed(() => store.state.maintenanceStats?.pending_orders || 0)
+    
+    // ✅ 新增：是否有新通知
+    const hasNewNotification = computed(() => store.state.hasNewNotification || false)
     
     // 计算头像URL
     const avatarUrl = computed(() => {
@@ -272,6 +278,8 @@ export default {
       activeTabbar,
       showFilter,
       stats,
+      todayCount,  // ✅ 新增
+      hasNewNotification,  // ✅ 新增
       onLoad,
       onRefresh,
       handleAction,

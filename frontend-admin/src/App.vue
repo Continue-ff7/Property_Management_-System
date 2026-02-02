@@ -18,6 +18,28 @@ export default {
     const store = useStore()
     let ws = null
     let heartbeatInterval = null
+    let reconnectTimer = null  // 重连定时器
+    
+    // 消息去重集合（记录最近收到的消息ID）
+    const recentMessageIds = new Set()
+    const MESSAGE_CACHE_TIME = 5000  // 5秒内的重复消息忽略
+    
+    // 检查消息是否重复
+    const isDuplicateMessage = (messageType, messageId) => {
+      const key = `${messageType}_${messageId}`
+      if (recentMessageIds.has(key)) {
+        console.log(`[去重] 忽略重复消息: ${key}`)
+        return true
+      }
+      
+      // 记录该消息，5秒后自动清除
+      recentMessageIds.add(key)
+      setTimeout(() => {
+        recentMessageIds.delete(key)
+      }, MESSAGE_CACHE_TIME)
+      
+      return false
+    }
     
     const initWebSocket = () => {
       const token = localStorage.getItem('token')
@@ -66,6 +88,11 @@ export default {
           const message = JSON.parse(event.data)
           
           if (message.type === 'new_repair') {
+            // ✅ 消息去重检查
+            if (isDuplicateMessage('new_repair', message.data.id)) {
+              return  // 忽略重复消息
+            }
+            
             // 收到新报修通知
             ElNotification({
               title: '新报修工单',
@@ -81,6 +108,11 @@ export default {
             store.dispatch('notifyNewRepair', message.data)
           }
           else if (message.type === 'repair_status_update') {
+            // ✅ 消息去重检查
+            if (isDuplicateMessage('repair_status_update', message.data.id || message.data.order_number)) {
+              return
+            }
+            
             // 收到工单状态更新通知（维修人员开始/完成维修）
             ElNotification({
               title: '工单状态更新',
@@ -95,6 +127,11 @@ export default {
             // 通过Vuex通知页面刷新
             store.dispatch('notifyRepairStatusUpdate', message.data)
           } else if (message.type === 'repair_evaluated') {
+            // ✅ 消息去重检查
+            if (isDuplicateMessage('repair_evaluated', message.data.id || message.data.order_number)) {
+              return
+            }
+            
             // ✅ 新增：处理评价通知
             ElNotification({
               title: '工单已评价',
@@ -118,16 +155,23 @@ export default {
         console.error('管理员WebSocket错误:', error)
       }
       
-      ws.onclose = () => {
-        console.log('管理员WebSocket连接关闭')
+      ws.onclose = (event) => {
+        console.log('管理员WebSocket连接关闭', event.code, event.reason)
         if (heartbeatInterval) {
           clearInterval(heartbeatInterval)
           heartbeatInterval = null
         }
-        // 3秒后重连
-        setTimeout(() => {
+        
+        // 清除旧的重连定时器
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer)
+        }
+        
+        // 3秒后尝试重连
+        reconnectTimer = setTimeout(() => {
           const currentUserInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
           if (currentUserInfo.role === 'manager') {
+            console.log('尝试重新连接WebSocket...')
             initWebSocket()
           }
         }, 3000)
@@ -135,9 +179,14 @@ export default {
     }
     
     const closeWebSocket = () => {
+      // 清除所有定时器
       if (heartbeatInterval) {
         clearInterval(heartbeatInterval)
         heartbeatInterval = null
+      }
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = null
       }
       if (ws) {
         ws.close()
