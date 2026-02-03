@@ -69,12 +69,12 @@
       </van-cell-group>
       
       <van-cell-group inset title="账户管理">
-        <van-cell title="修改密码" is-link>
+        <van-cell title="修改密码" is-link @click="showPasswordDialog = true">
           <template #icon>
             <van-icon name="lock" size="20" style="margin-right: 12px;" />
           </template>
         </van-cell>
-        <van-cell title="关于我们" is-link>
+        <van-cell title="关于我们" is-link @click="showAboutDialog = true">
           <template #icon>
             <van-icon name="info-o" size="20" style="margin-right: 12px;" />
           </template>
@@ -138,6 +138,53 @@
         </van-cell-group>
       </div>
     </van-dialog>
+    
+    <!-- 修改密码弹窗 -->
+    <van-dialog
+      :show="showPasswordDialog"
+      title="修改密码"
+      show-cancel-button
+      @confirm="handleChangePassword"
+      @cancel="showPasswordDialog = false"
+      @close="showPasswordDialog = false"
+    >
+      <div class="password-form">
+        <van-cell-group inset>
+          <van-field
+            v-model="passwordForm.oldPassword"
+            type="password"
+            label="旧密码"
+            placeholder="请输入旧密码"
+          />
+          <van-field
+            v-model="passwordForm.newPassword"
+            type="password"
+            label="新密码"
+            placeholder="请输入新密码"
+          />
+          <van-field
+            v-model="passwordForm.confirmPassword"
+            type="password"
+            label="确认密码"
+            placeholder="请再次输入新密码"
+          />
+        </van-cell-group>
+      </div>
+    </van-dialog>
+    
+    <!-- 关于我们弹窗 -->
+    <van-dialog
+      :show="showAboutDialog"
+      title="关于我们"
+      confirm-button-text="确定"
+      @confirm="showAboutDialog = false"
+      @close="showAboutDialog = false"
+    >
+      <div class="about-content">
+        <div class="about-title">毕业设计</div>
+        <div class="about-author">made by fangjiacheng</div>
+      </div>
+    </van-dialog>
   </div>
 </template>
 
@@ -145,7 +192,7 @@
 import { ref, computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useStore } from 'vuex'
-import { showConfirmDialog, showSuccessToast, showLoadingToast, showFailToast } from 'vant'
+import { showConfirmDialog, showSuccessToast, showLoadingToast, showFailToast, showToast } from 'vant'
 import { ownerAPI, uploadAPI } from '@/api'
 import { getImageUrl } from '@/utils/request'
 
@@ -157,6 +204,8 @@ export default {
     const userInfo = computed(() => store.state.userInfo)
     const properties = ref([])
     const showEdit = ref(false)
+    const showPasswordDialog = ref(false)
+    const showAboutDialog = ref(false)
     const avatarFile = ref([])
     
     // 编辑表单
@@ -165,6 +214,13 @@ export default {
       email: '',
       phone: '',
       avatar: ''
+    })
+    
+    // 密码表单
+    const passwordForm = reactive({
+      oldPassword: '',
+      newPassword: '',
+      confirmPassword: ''
     })
     
     const loadProperties = async () => {
@@ -239,6 +295,57 @@ export default {
       }
     }
     
+    const handleChangePassword = async () => {
+      // 验证表单
+      if (!passwordForm.oldPassword) {
+        showToast('请输入旧密码')
+        return
+      }
+      if (!passwordForm.newPassword) {
+        showToast('请输入新密码')
+        return
+      }
+      if (passwordForm.newPassword.length < 6) {
+        showToast('新密码至少6位')
+        return
+      }
+      if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+        showToast('两次输入的密码不一致')
+        return
+      }
+      
+      const loading = showLoadingToast({
+        message: '修改中...',
+        forbidClick: true,
+        duration: 0
+      })
+      
+      try {
+        await ownerAPI.changePassword({
+          old_password: passwordForm.oldPassword,
+          new_password: passwordForm.newPassword
+        })
+        
+        loading.close()
+        showSuccessToast('密码修改成功，请重新登录')
+        showPasswordDialog.value = false
+        
+        // 清空表单
+        passwordForm.oldPassword = ''
+        passwordForm.newPassword = ''
+        passwordForm.confirmPassword = ''
+        
+        // 退出登录
+        setTimeout(() => {
+          store.dispatch('logout')
+          router.replace('/login')
+        }, 1500)
+      } catch (error) {
+        loading.close()
+        showFailToast(error.message || '密码修改失败')
+      }
+    }
+    
     const handleLogout = async () => {
       try {
         await showConfirmDialog({
@@ -267,12 +374,16 @@ export default {
       userInfo,
       properties,
       showEdit,
+      showPasswordDialog,
+      showAboutDialog,
       avatarFile,
       editForm,
+      passwordForm,
       getImageUrl,
       showEditDialog,
       handleAvatarUpload,
       handleSaveProfile,
+      handleChangePassword,
       handleLogout
     }
   }
@@ -360,5 +471,32 @@ export default {
 
 .edit-form :deep(.van-cell-group) {
   margin-top: 16px;
+}
+
+/* 密码表单样式 */
+.password-form {
+  padding: 20px;
+}
+
+.password-form :deep(.van-cell-group) {
+  margin-top: 0;
+}
+
+/* 关于我们样式 */
+.about-content {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.about-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #323233;
+  margin-bottom: 16px;
+}
+
+.about-author {
+  font-size: 14px;
+  color: #969799;
 }
 </style>

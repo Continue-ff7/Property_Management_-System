@@ -121,7 +121,7 @@ export default {
     const messages = ref([
       {
         type: 'ai',
-        content: '您好！我是您的AI助手，我可以帮您：\n1. 查询账单信息\n2. 查询报修记录\n3. 帮您提交报修\n\n有什么可以帮助您的吗？'
+        content: '您好！我是您的AI助手，我可以帮您：\n1. 查询账单信息\n2. 查询报修记录\n3. 帮您提交报修\n4. 查询投诉记录\n5. 帮您提交投诉\n\n有什么可以帮助您的吗？'
       }
     ])
     const inputText = ref('')
@@ -133,7 +133,7 @@ export default {
     const conversationHistory = ref([
       {
         role: 'system',
-        content: '你是一个物业管理系统的AI助手。你可以帮助业主查询账单、报修记录、房产信息，也可以帮助他们提交报修工单。请用友好、专业的语气回答问题。'
+        content: '你是一个物业管理系统的AI助手。你可以帮助业主查询账单、报修记录、投诉记录、房产信息，也可以帮助他们提交报修工单和投诉。请用友好、专业的语气回答问题。'
       }
     ])
     
@@ -148,6 +148,8 @@ export default {
       { text: '查询我的账单' },
       { text: '查看报修记录' },
       { text: '我要报修' },
+      { text: '查看投诉记录' },
+      { text: '我要投诉' },
       { text: '查询房产信息' }
     ])
     
@@ -216,6 +218,44 @@ export default {
               }
             },
             required: ['property_id', 'description']
+          }
+        }
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'get_complaints',
+          description: '查询用户的投诉记录，包括投诉类型、内容、状态、回复等',
+          parameters: {
+            type: 'object',
+            properties: {},
+            required: []
+          }
+        }
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'create_complaint',
+          description: '帮用户创建投诉，需要提供投诉类型和投诉内容',
+          parameters: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                description: '投诉类型，可选值：environment(环境卫生)、facility(设施维修)、noise(噪音扰民)、parking(停车管理)、security(安全问题)、service(服务态度)、other(其他)',
+                enum: ['environment', 'facility', 'noise', 'parking', 'security', 'service', 'other']
+              },
+              content: {
+                type: 'string',
+                description: '投诉内容的详细描述'
+              },
+              contact_phone: {
+                type: 'string',
+                description: '联系电话，可选，默认使用用户的手机号'
+              }
+            },
+            required: ['type', 'content']
           }
         }
       }
@@ -314,6 +354,66 @@ export default {
           console.error('Error creating repair:', error)
           const errorMsg = error.response?.data?.message || error.message || '未知错误'
           return `创建报修工单失败：${errorMsg}`
+        }
+      },
+      
+      get_complaints: async () => {
+        try {
+          const response = await aiAssistantAPI.getComplaints()
+          const complaints = response.data || []
+          
+          if (complaints.length === 0) {
+            return '您当前没有任何投诉记录。'
+          }
+          
+          let result = `您共有 ${complaints.length} 条投诉记录：\n\n`
+          complaints.forEach((complaint, index) => {
+            result += `${index + 1}. 【${complaint.type_text || complaint.type}】\n`
+            result += `   内容：${complaint.content}\n`
+            result += `   状态：${complaint.status_text || complaint.status}\n`
+            if (complaint.reply) {
+              result += `   回复：${complaint.reply}\n`
+            }
+            if (complaint.rating) {
+              result += `   评分：${complaint.rating}星\n`
+            }
+            result += `   提交时间：${complaint.created_at}\n\n`
+          })
+          
+          return result
+        } catch (error) {
+          console.error('Error fetching complaints:', error)
+          return '查询投诉记录失败，请稍后重试。'
+        }
+      },
+      
+      create_complaint: async (params) => {
+        try {
+          const { type, content, contact_phone } = params
+          const response = await aiAssistantAPI.createComplaint({
+            type,
+            content,
+            contact_phone
+          })
+          
+          if (response.code === 200 || response.success) {
+            const typeMap = {
+              'environment': '环境卫生',
+              'facility': '设施维修',
+              'noise': '噪音扰民',
+              'parking': '停车管理',
+              'security': '安全问题',
+              'service': '服务态度',
+              'other': '其他'
+            }
+            return `投诉提交成功！\n类型：${typeMap[type] || type}\n状态：待处理\n物业工作人员会尽快处理您的投诉。`
+          } else {
+            return `创建投诉失败：${response.message || '未知错误'}`
+          }
+        } catch (error) {
+          console.error('Error creating complaint:', error)
+          const errorMsg = error.response?.data?.message || error.message || '未知错误'
+          return `创建投诉失败：${errorMsg}`
         }
       }
     }
@@ -508,7 +608,9 @@ export default {
           get_bills: '查询账单',
           get_repairs: '查询报修记录',
           get_properties: '查询房产信息',
-          create_repair: '创建报修工单'
+          create_repair: '创建报修工单',
+          get_complaints: '查询投诉记录',
+          create_complaint: '创建投诉'
         }
         
         toolMessage.tools.push({

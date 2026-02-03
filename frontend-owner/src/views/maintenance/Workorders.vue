@@ -18,12 +18,9 @@
     </div>
     
     <div class="content">
-      <!-- 标题和筛选 -->
+      <!-- 标题 -->
       <div class="title-bar">
         <h2>我的工单</h2>
-        <van-button size="small" icon="filter-o" @click="showFilter = true">
-          筛选
-        </van-button>
       </div>
       
       <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
@@ -119,7 +116,6 @@ export default {
     const refreshing = ref(false)
     const activeTab = ref('all')
     const activeTabbar = ref(0)
-    const showFilter = ref(false)
     const stats = reactive({
       pending: 0,
       in_progress: 0,
@@ -276,7 +272,6 @@ export default {
       refreshing,
       activeTab,
       activeTabbar,
-      showFilter,
       stats,
       todayCount,  // ✅ 新增
       hasNewNotification,  // ✅ 新增

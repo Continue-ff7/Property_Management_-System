@@ -193,3 +193,40 @@ class RepairChatMessage(Model):
     class Meta:
         table = "repair_chat_messages"
         ordering = ["created_at"]
+
+
+class ComplaintType(str, Enum):
+    ENVIRONMENT = "environment"  # 环境卫生
+    FACILITY = "facility"  # 设施维修
+    NOISE = "noise"  # 噪音扰民
+    PARKING = "parking"  # 停车管理
+    SECURITY = "security"  # 安全问题
+    SERVICE = "service"  # 服务态度
+    OTHER = "other"  # 其他
+
+
+class ComplaintStatus(str, Enum):
+    PENDING = "pending"  # 待处理
+    PROCESSING = "processing"  # 处理中
+    COMPLETED = "completed"  # 已完成
+
+
+class Complaint(Model):
+    """物业投诉表"""
+    id = fields.IntField(pk=True)
+    owner = fields.ForeignKeyField("models.User", related_name="complaints", description="投诉人")
+    type = fields.CharEnumField(ComplaintType, description="投诉类型")
+    content = fields.TextField(description="投诉内容")
+    images = fields.JSONField(null=True, description="图片URL数组")
+    contact_phone = fields.CharField(max_length=20, description="联系电话")
+    status = fields.CharEnumField(ComplaintStatus, default=ComplaintStatus.PENDING, description="处理状态")
+    handler = fields.ForeignKeyField("models.User", related_name="handled_complaints", null=True, description="处理人")
+    reply = fields.TextField(null=True, description="物业回复")
+    rating = fields.IntField(null=True, description="评分1-5")
+    created_at = fields.DatetimeField(auto_now_add=True, description="创建时间")
+    updated_at = fields.DatetimeField(auto_now=True, description="更新时间")
+    completed_at = fields.DatetimeField(null=True, description="完成时间")
+    
+    class Meta:
+        table = "complaints"
+        ordering = ["-created_at"]

@@ -266,3 +266,64 @@ async def notify_repair_evaluation(order_id: int, maintenance_worker_id: int, ev
                     del manager_connections[user_id]
     
     print(f"[WebSocket] 评价通知完成, 已通知 {total_managers} 个管理员")
+
+
+async def notify_new_complaint(complaint_data: dict):
+    """通知所有管理员有新的投诉"""
+    total_connections = sum(len(connections) for connections in manager_connections.values())
+    print(f"[WebSocket] 通知管理员新投诉, 当前管理员数: {len(manager_connections)}, 总连接数: {total_connections}")
+    print(f"[WebSocket] 消息: {complaint_data}")
+    
+    # 遍历所有管理员的所有连接
+    for user_id, connections in list(manager_connections.items()):
+        for websocket in connections.copy():
+            try:
+                await websocket.send_json({
+                    "type": "new_complaint",
+                    "data": complaint_data
+                })
+                print(f"[WebSocket] 成功发送消息给管理员 {user_id}")
+            except Exception as e:
+                print(f"[WebSocket] 发送失败: {e}")
+                manager_connections[user_id].discard(websocket)
+                if not manager_connections[user_id]:
+                    del manager_connections[user_id]
+
+
+async def notify_complaint_update(owner_id: int, complaint_data: dict):
+    """通知业主投诉状态更新"""
+    print(f"[WebSocket] 通知业主 {owner_id} 投诉更新, 当前连接数: {len(owner_connections.get(owner_id, []))}")
+    print(f"[WebSocket] 消息: {complaint_data}")
+    if owner_id in owner_connections:
+        for websocket in owner_connections[owner_id].copy():
+            try:
+                await websocket.send_json({
+                    "type": "complaint_update",
+                    "data": complaint_data
+                })
+                print(f"[WebSocket] 成功发送消息给业主 {owner_id}")
+            except Exception as e:
+                print(f"[WebSocket] 发送失败: {e}")
+                owner_connections[owner_id].discard(websocket)
+    else:
+        print(f"[WebSocket] 业主 {owner_id} 未连接")
+
+
+async def notify_complaint_rated(complaint_data: dict):
+    """通知所有管理员有新的投诉评价"""
+    total_connections = sum(len(connections) for connections in manager_connections.values())
+    print(f"[WebSocket] 通知管理员投诉被评价, 当前管理员数: {len(manager_connections)}, 总连接数: {total_connections}")
+    
+    for user_id, connections in list(manager_connections.items()):
+        for websocket in connections.copy():
+            try:
+                await websocket.send_json({
+                    "type": "complaint_rated",
+                    "data": complaint_data
+                })
+                print(f"[WebSocket] 成功发送评价通知给管理员 {user_id}")
+            except Exception as e:
+                print(f"[WebSocket] 发送失败: {e}")
+                manager_connections[user_id].discard(websocket)
+                if not manager_connections[user_id]:
+                    del manager_connections[user_id]

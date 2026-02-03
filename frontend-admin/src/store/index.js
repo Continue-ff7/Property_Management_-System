@@ -6,7 +6,9 @@ export default createStore({
     userInfo: JSON.parse(localStorage.getItem('userInfo') || '{}'),
     sidebarCollapsed: false,
     newRepairNotification: null,  // 新报修通知
-    repairStatusUpdate: null  // 工单状态更新通知（维修人员开始/完成维修）
+    repairStatusUpdate: null,  // 工单状态更新通知（维修人员开始/完成维修）
+    newComplaintNotification: null,  // 新投诉通知
+    complaintRatedNotification: null  // 投诉评价通知
   },
   
   getters: {
@@ -43,6 +45,14 @@ export default createStore({
     
     SET_REPAIR_STATUS_UPDATE(state, data) {
       state.repairStatusUpdate = data
+    },
+    
+    SET_NEW_COMPLAINT_NOTIFICATION(state, data) {
+      state.newComplaintNotification = data
+    },
+    
+    SET_COMPLAINT_RATED_NOTIFICATION(state, data) {
+      state.complaintRatedNotification = data
     }
   },
   
@@ -62,6 +72,14 @@ export default createStore({
     
     notifyRepairStatusUpdate({ commit }, repairData) {
       commit('SET_REPAIR_STATUS_UPDATE', repairData)
+    },
+    
+    notifyNewComplaint({ commit }, complaintData) {
+      commit('SET_NEW_COMPLAINT_NOTIFICATION', complaintData)
+    },
+    
+    notifyComplaintRated({ commit }, complaintData) {
+      commit('SET_COMPLAINT_RATED_NOTIFICATION', complaintData)
     }
   }
 })

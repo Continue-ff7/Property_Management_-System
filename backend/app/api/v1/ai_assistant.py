@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.models import User, RepairOrder, Bill, Property
+from app.models import User, RepairOrder, Bill, Property, Complaint
 from app.core.dependencies import get_current_user
 from typing import Dict, Any
 
@@ -205,4 +205,106 @@ async def create_repair_order(
             "code": 500,
             "success": False,
             "message": f"创建报修失败: {str(e)}"
+        }
+
+
+@router.get("/ai/complaints")
+async def get_user_complaints(current_user: User = Depends(get_current_user)):
+    """获取用户的投诉记录"""
+    try:
+        complaints = await Complaint.filter(owner_id=current_user.id).order_by('-created_at')
+        
+        complaints_data = []
+        for complaint in complaints:
+            complaints_data.append({
+                "id": complaint.id,
+                "type": complaint.type.value,
+                "type_text": "环境卫生" if complaint.type.value == "environment" else
+                             "设施维修" if complaint.type.value == "facility" else
+                             "噪音扰民" if complaint.type.value == "noise" else
+                             "停车管理" if complaint.type.value == "parking" else
+                             "安全问题" if complaint.type.value == "security" else
+                             "服务态度" if complaint.type.value == "service" else "其他",
+                "content": complaint.content,
+                "status": complaint.status.value,
+                "status_text": "待处理" if complaint.status.value == "pending" else
+                              "处理中" if complaint.status.value == "processing" else
+                              "已完成",
+                "reply": complaint.reply,
+                "rating": complaint.rating,
+                "created_at": complaint.created_at.isoformat() if complaint.created_at else None
+            })
+        
+        return {
+            "success": True,
+            "data": complaints_data,
+            "message": f"找到 {len(complaints_data)} 条投诉记录"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "data": [],
+            "message": f"查询投诉记录失败: {str(e)}"
+        }
+
+
+@router.post("/ai/create-complaint")
+async def create_complaint(
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """创建投诉"""
+    try:
+        from app.models import ComplaintType, ComplaintStatus
+        
+        # 获取参数
+        complaint_type = data.get('type')
+        content = data.get('content')
+        contact_phone = data.get('contact_phone', current_user.phone)
+        
+        if not complaint_type or not content:
+            return {
+                "code": 400,
+                "success": False,
+                "message": "缺少必要参数"
+            }
+        
+        # 创建投诉
+        complaint = await Complaint.create(
+            owner_id=current_user.id,
+            type=ComplaintType(complaint_type),
+            content=content,
+            contact_phone=contact_phone,
+            status=ComplaintStatus.PENDING,
+            images=[]
+        )
+        
+        # WebSocket通知管理员
+        from app.api.v1.websocket import notify_new_complaint
+        await notify_new_complaint({
+            "id": complaint.id,
+            "owner_id": current_user.id,
+            "owner_name": current_user.name,
+            "type": complaint_type,
+            "content": content,
+            "contact_phone": contact_phone,
+            "status": "pending",
+            "created_at": complaint.created_at.isoformat() if complaint.created_at else None,
+            "updated_at": complaint.updated_at.isoformat() if complaint.updated_at else None
+        })
+        
+        return {
+            "code": 200,
+            "success": True,
+            "data": {
+                "id": complaint.id,
+                "created_at": complaint.created_at.isoformat() if complaint.created_at else None
+            },
+            "message": "投诉已提交成功"
+        }
+    except Exception as e:
+        return {
+            "code": 500,
+            "success": False,
+            "message": f"创建投诉失败: {str(e)}"
         }

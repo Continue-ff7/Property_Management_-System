@@ -129,6 +129,37 @@ export default {
                 
                 // 通过Vuex通知页面更新
                 store.dispatch('notifyRepairStatusUpdate', message.data)
+              } else if (message.type === 'complaint_update') {
+                // ✅ 新增：投诉状态更新通知
+                if (isDuplicateMessage('complaint_update', message.data.id)) {
+                  return
+                }
+                
+                // 检查是否被删除
+                if (message.data.status === 'deleted') {
+                  // 删除时不弹窗，只通过Vuex触发列表刷新
+                  console.log('投诉已被删除，静默刷新列表')
+                } else {
+                  // 正常状态更新：显示通知
+                  const statusMap = {
+                    'pending': '待处理',
+                    'processing': '处理中',
+                    'completed': '已完成'
+                  }
+                  
+                  const notify = showNotify({
+                    type: 'primary',
+                    message: `您的投诉状态已更新\n状态：${statusMap[message.data.status] || message.data.status}${message.data.reply ? '\n回复：' + message.data.reply : ''}`,
+                    duration: 0,
+                    onClick: () => {
+                      notify.close()
+                      router.push('/complaints')
+                    }
+                  })
+                }
+                
+                // 通过Vuex通知页面更新（删除和正常更新都需要）
+                store.dispatch('notifyComplaintUpdate', message.data)
               }
             } else if (currentRole === 'maintenance') {
               // 维修人员端消息处理

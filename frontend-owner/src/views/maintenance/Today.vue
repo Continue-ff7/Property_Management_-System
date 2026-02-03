@@ -2,7 +2,7 @@
   <div class="today-page">
     <!-- 顶部导航 -->
     <van-nav-bar
-      title="今日任务"
+      title="任务"
       left-arrow
       @click-left="$router.back()"
       fixed
@@ -23,7 +23,7 @@
       <div class="stat-divider"></div>
       <div class="stat-item">
         <div class="stat-value">{{ stats.completed_orders || 0 }}</div>
-        <div class="stat-label">今日完成</div>
+        <div class="stat-label">累计完成</div>
       </div>
     </div>
     
@@ -31,7 +31,7 @@
     <div class="content">
       <div class="section-title">
         <van-icon name="calendar-o" />
-        <span>今日待办 ({{ pendingWorkorders.length }})</span>
+        <span>待办 ({{ pendingWorkorders.length }})</span>
       </div>
       
       <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
@@ -73,7 +73,7 @@
           </div>
         </div>
         
-        <van-empty v-else description="今日暂无待办任务" image="search" />
+        <van-empty v-else description="暂无待办任务" image="search" />
       </van-pull-refresh>
     </div>
     

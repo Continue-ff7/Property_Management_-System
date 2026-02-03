@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.responses import FileResponse, HTMLResponse
 from app.core.dependencies import get_current_owner, get_current_owner_optional_token, generate_order_number
+from app.core.security import verify_password, get_password_hash
 from pydantic import BaseModel
 from app.models import User, Property, Bill, RepairOrder, Building, BillStatus, RepairStatus
 from app.schemas import (
@@ -32,6 +33,12 @@ class UpdateProfileRequest(BaseModel):
     name: str = None
     email: str = None
     avatar: str = None  # 头像URL
+
+
+# 修改密码请求模型
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
 
 
 @router.get("/profile")
@@ -78,6 +85,28 @@ async def update_profile(
             "role": current_user.role,  # 必须返回 role 字段，否则前端路由守卫会判断角色不匹配
             "created_at": current_user.created_at
         }
+    }
+
+
+@router.post("/change-password")
+async def change_password(
+    password_data: ChangePasswordRequest,
+    current_user: User = Depends(get_current_owner)
+):
+    """修改密码"""
+    # 验证旧密码
+    if not verify_password(password_data.old_password, current_user.password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="旧密码错误"
+        )
+    
+    # 设置新密码
+    current_user.password = get_password_hash(password_data.new_password)
+    await current_user.save()
+    
+    return {
+        "message": "密码修改成功"
     }
 
 

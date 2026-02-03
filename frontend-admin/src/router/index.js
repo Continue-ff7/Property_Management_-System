@@ -55,6 +55,12 @@ const routes = [
         name: 'Announcements',
         component: () => import('@/views/announcements/Index.vue'),
         meta: { title: '公告管理', icon: 'Bell' }
+      },
+      {
+        path: 'complaints',
+        name: 'Complaints',
+        component: () => import('@/views/complaints/Index.vue'),
+        meta: { title: '投诉管理', icon: 'ChatDotSquare' }
       }
     ]
   }

@@ -41,6 +41,20 @@ export default {
       return false
     }
     
+    // 投诉类型名称转换
+    const getTypeName = (type) => {
+      const names = {
+        'environment': '环境卫生',
+        'facility': '设施维修',
+        'noise': '噪音扰民',
+        'parking': '停车管理',
+        'security': '安全问题',
+        'service': '服务态度',
+        'other': '其他'
+      }
+      return names[type] || type
+    }
+    
     const initWebSocket = () => {
       const token = localStorage.getItem('token')
       const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
@@ -145,6 +159,46 @@ export default {
             
             // 通过Vuex通知页面刷新
             store.dispatch('notifyRepairStatusUpdate', message.data)
+          }
+          else if (message.type === 'new_complaint') {
+            // 新投诉通知
+            if (isDuplicateMessage('new_complaint', message.data.id)) {
+              return  // 忽略重复消息
+            }
+            
+            ElNotification({
+              title: '新投诉',
+              message: `${message.data.owner_name} 提交了新投诉\n类型：${getTypeName(message.data.type)}`,
+              type: 'warning',
+              duration: 0,  // 不自动关闭
+              onClick: () => {
+                router.push('/complaints')
+              }
+            })
+            
+            // 通过Vuex通知页面刷新
+            store.dispatch('notifyNewComplaint', message.data)
+          }
+          else if (message.type === 'complaint_rated') {
+            // 投诉评价通知
+            if (isDuplicateMessage('complaint_rated', message.data.id)) {
+              return
+            }
+            
+            const ratingStars = '⭐'.repeat(message.data.rating || 0)
+            
+            ElNotification({
+              title: '投诉评价',
+              message: `${message.data.owner_name} 对投诉进行了评价\n评分：${ratingStars} (${message.data.rating}分)`,
+              type: 'success',
+              duration: 0,
+              onClick: () => {
+                router.push('/complaints')
+              }
+            })
+            
+            // 通过Vuex通知页面刷新
+            store.dispatch('notifyComplaintRated', message.data)
           }
         } catch (error) {
           console.error('WebSocket消息解析失败:', error)

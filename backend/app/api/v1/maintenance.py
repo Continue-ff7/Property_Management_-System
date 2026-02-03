@@ -333,16 +333,15 @@ async def get_my_statistics(
         status=RepairStatus.IN_PROGRESS
     ).count()
     
-    # 已完成
+    # 累计完成：统计所有已完成维修的工单（有完成时间）
     completed_orders = await RepairOrder.filter(
         maintenance_worker_id=current_user.id,
-        status=RepairStatus.COMPLETED
+        completed_at__isnull=False
     ).count()
     
-    # 平均评分
+    # 平均评分：只统计已评价的工单
     completed = await RepairOrder.filter(
         maintenance_worker_id=current_user.id,
-        status=RepairStatus.COMPLETED,
         rating__not_isnull=True
     )
     

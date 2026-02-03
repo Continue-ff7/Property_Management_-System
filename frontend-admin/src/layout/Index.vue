@@ -47,6 +47,11 @@
           <el-icon><Bell /></el-icon>
           <template #title>公告管理</template>
         </el-menu-item>
+        
+        <el-menu-item index="/complaints">
+          <el-icon><ChatDotSquare /></el-icon>
+          <template #title>投诉管理</template>
+        </el-menu-item>
       </el-menu>
     </aside>
     
@@ -93,14 +98,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import {
-  DataAnalysis, User, OfficeBuilding, Tickets, Tools, UserFilled, Bell,
+  DataAnalysis, User, OfficeBuilding, Tickets, Tools, UserFilled, Bell, ChatDotSquare,
   Fold, Expand, SwitchButton
 } from '@element-plus/icons-vue'
 
 export default {
   name: 'Layout',
   components: {
-    DataAnalysis, User, OfficeBuilding, Tickets, Tools, UserFilled, Bell,
+    DataAnalysis, User, OfficeBuilding, Tickets, Tools, UserFilled, Bell, ChatDotSquare,
     Fold, Expand, SwitchButton
   },
   setup() {

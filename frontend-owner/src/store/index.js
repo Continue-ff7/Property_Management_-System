@@ -11,6 +11,7 @@ export default createStore({
     workorderDeleted: null,        // 维修人员：工单被删除通知
     workorderEvaluated: null,      // ✅ 新增：维修人员：工单被评价通知
     workorderStatusUpdate: null,   // ✅ 新增：维修工单状态更新（用于维修人员端自动刷新）
+    complaintUpdate: null,         // ✅ 新增：业主：投诉状态更新通知
     // ✅ 新增：维修人员统计数据
     maintenanceStats: null,
     // ✅ 新增：是否有新通知
@@ -66,6 +67,11 @@ export default createStore({
     // ✅ 新增：设置新通知状态
     SET_HAS_NEW_NOTIFICATION(state, hasNew) {
       state.hasNewNotification = hasNew
+    },
+    
+    // ✅ 新增：投诉状态更新
+    SET_COMPLAINT_UPDATE(state, data) {
+      state.complaintUpdate = data
     }
   },
   
@@ -107,6 +113,11 @@ export default createStore({
           console.error('加载统计数据失败:', error)
         }
       }
+    },
+    
+    // ✅ 新增：投诉状态更新通知
+    notifyComplaintUpdate({ commit }, data) {
+      commit('SET_COMPLAINT_UPDATE', data)
     }
   }
 })

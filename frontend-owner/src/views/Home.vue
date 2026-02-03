@@ -32,9 +32,9 @@
         <van-icon name="volume-o" size="28" color="#409eff" />
         <span>公告通知</span>
       </div>
-      <div class="menu-item">
-        <van-icon name="clock-o" size="28" color="#e6a23c" />
-        <span>访客登记</span>
+      <div class="menu-item" @click="goTo('/complaints')">
+        <van-icon name="chat-o" size="28" color="#ff6b6b" />
+        <span>物业投诉</span>
       </div>
       <div class="menu-item" @click="goTo('/repair/create')">
         <van-icon name="add-o" size="28" color="#909399" />

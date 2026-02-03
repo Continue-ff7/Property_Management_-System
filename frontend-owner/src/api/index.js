@@ -37,6 +37,14 @@ export const ownerAPI = {
       data
     })
   },
+  // 修改密码
+  changePassword(data) {
+    return request({
+      url: '/owner/change-password',
+      method: 'post',
+      data
+    })
+  },
   // 获取我的房产
   getMyProperties() {
     return request({
@@ -240,6 +248,21 @@ export const aiAssistantAPI = {
   createRepair(data) {
     return request({
       url: '/ai/create-repair',
+      method: 'post',
+      data
+    })
+  },
+  // 查询投诉记录
+  getComplaints() {
+    return request({
+      url: '/ai/complaints',
+      method: 'get'
+    })
+  },
+  // 创建投诉
+  createComplaint(data) {
+    return request({
+      url: '/ai/create-complaint',
       method: 'post',
       data
     })

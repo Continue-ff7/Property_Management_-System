@@ -128,6 +128,25 @@ const routes = [
     component: () => import('@/views/maintenance/Notifications.vue'),
     meta: { title: '通知中心', requiresAuth: true, role: 'maintenance' }
   },
+  // ✅ 新增：物业投诉
+  {
+    path: '/complaints',
+    name: 'Complaints',
+    component: () => import('@/views/Complaints.vue'),
+    meta: { title: '物业投诉', role: 'owner' }
+  },
+  {
+    path: '/complaint/create',
+    name: 'ComplaintCreate',
+    component: () => import('@/views/ComplaintCreate.vue'),
+    meta: { title: '提交投诉', role: 'owner' }
+  },
+  {
+    path: '/complaint/:id',
+    name: 'ComplaintDetail',
+    component: () => import('@/views/ComplaintDetail.vue'),
+    meta: { title: '投诉详情', role: 'owner' }
+  },
   // 维修人员端聊天
   {
     path: '/maintenance/workorder/:id/chat',
