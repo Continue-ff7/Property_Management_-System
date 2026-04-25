@@ -1,10 +1,48 @@
 import { createStore } from 'vuex'
 import { maintenanceWorkorderAPI } from '@/api'
 
+// 获取token key，根据当前角色
+const getTokenKey = (role) => {
+  if (role === 'maintenance') return 'maintenance_token'
+  return 'owner_token'
+}
+
+// 获取userInfo key，根据当前角色
+const getUserInfoKey = (role) => {
+  if (role === 'maintenance') return 'maintenance_userInfo'
+  return 'owner_userInfo'
+}
+
+// 获取当前角色（本地开发版）
+const getCurrentRole = () => {
+  const path = window.location.pathname
+  
+  // 本地开发：pathname 包含 /maintenance
+  if (path.startsWith('/maintenance')) {
+    return 'maintenance'
+  }
+  
+  // 默认业主
+  return 'owner'
+}
+
+// 获取当前角色的用户信息
+const getCurrentUserInfo = () => {
+  const role = getCurrentRole()
+  const data = localStorage.getItem(getUserInfoKey(role))
+  return data ? JSON.parse(data) : {}
+}
+
+// 获取当前角色的token
+const getCurrentToken = () => {
+  const role = getCurrentRole()
+  return localStorage.getItem(getTokenKey(role)) || ''
+}
+
 export default createStore({
   state: {
-    token: localStorage.getItem('token') || '',
-    userInfo: JSON.parse(localStorage.getItem('userInfo') || '{}'),
+    token: getCurrentToken(),
+    userInfo: getCurrentUserInfo(),
     // WebSocket通知状态
     repairStatusUpdate: null,      // 业主：工单状态更新通知
     newWorkorder: null,            // 维修人员：新工单通知
@@ -19,21 +57,27 @@ export default createStore({
   },
   
   mutations: {
-    SET_TOKEN(state, token) {
+    SET_TOKEN(state, { token, role }) {
       state.token = token
-      localStorage.setItem('token', token)
+      // 存 token
+      const key = getTokenKey(role)
+      localStorage.setItem(key, token)
     },
     
     SET_USER_INFO(state, userInfo) {
       state.userInfo = userInfo
-      localStorage.setItem('userInfo', JSON.stringify(userInfo))
+      const key = getUserInfoKey(userInfo.role)
+      localStorage.setItem(key, JSON.stringify(userInfo))
     },
     
     CLEAR_TOKEN(state) {
       state.token = ''
       state.userInfo = {}
-      localStorage.removeItem('token')
-      localStorage.removeItem('userInfo')
+      // 清除所有token和userInfo
+      localStorage.removeItem('owner_token')
+      localStorage.removeItem('maintenance_token')
+      localStorage.removeItem('owner_userInfo')
+      localStorage.removeItem('maintenance_userInfo')
     },
     
     // WebSocket通知相关mutations
@@ -77,7 +121,7 @@ export default createStore({
   
   actions: {
     login({ commit }, { token, userInfo }) {
-      commit('SET_TOKEN', token)
+      commit('SET_TOKEN', { token, role: userInfo.role })
       commit('SET_USER_INFO', userInfo)
     },
     

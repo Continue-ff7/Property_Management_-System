@@ -123,11 +123,11 @@
         <van-cell title="完成时间" :value="formatDate(workorder.completed_at)" />
         
         <!-- 维修费用 -->
-        <van-cell v-if="workorder.repair_cost && workorder.repair_cost > 0" title="维修费用">
+        <van-cell v-if="workorder.repair_cost !== null && workorder.repair_cost !== undefined" title="维修费用">
           <template #value>
             <span style="color: #ff6b6b; font-weight: bold;">￥{{ workorder.repair_cost }}</span>
             <van-tag v-if="workorder.cost_paid" type="success" style="margin-left: 8px;">已支付</van-tag>
-            <van-tag v-else type="warning" style="margin-left: 8px;">未支付</van-tag>
+            <van-tag v-else type="warning" style="margin-left: 8px;">待支付</van-tag>
           </template>
         </van-cell>
         
@@ -148,32 +148,14 @@
         </div>
       </div>
       
-      <!-- ✅ 业主评价信息 -->
+      <!-- 业主评价 -->
       <div class="evaluation-card" v-if="workorder.rating && (workorder.status === 'finished' || workorder.status === 'pending_evaluation')">
-        <div class="card-title">
-          <van-icon name="star" color="#ee0a24" />
+        <div class="section-header">
+          <van-icon name="star-o" />
           <span>业主评价</span>
         </div>
-        
-        <!-- 评分 -->
-        <div class="rating-section">
-          <van-rate
-            v-model="workorder.rating"
-            :readonly="true"
-            :size="24"
-            void-color="#eee"
-          />
-          <span class="rating-score">{{ workorder.rating }}.0 分</span>
-        </div>
-        
-        <!-- 评论内容 -->
-        <div class="comment-section" v-if="workorder.comment">
-          <div class="comment-label">评论内容：</div>
-          <div class="comment-text">{{ workorder.comment }}</div>
-        </div>
-        <div class="comment-section" v-else>
-          <div class="comment-text" style="color: #969799;">业主未填写评论</div>
-        </div>
+        <van-rate v-model="workorder.rating" :size="20" readonly />
+        <p class="eval-comment">{{ workorder.comment || '业主未填写评论' }}</p>
       </div>
     </div>
     
@@ -742,42 +724,24 @@ export default {
   border: 1px solid #f2f3f5;
 }
 
-.evaluation-card .card-title {
-  color: #ee0a24;
-}
-
-.rating-section {
+.evaluation-card .section-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 0;
-  border-bottom: 1px solid #f2f3f5;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #323233;
+  margin-bottom: 12px;
 }
 
-.rating-score {
-  font-size: 18px;
-  font-weight: bold;
-  color: #ee0a24;
+.evaluation-card .van-rate {
+  margin-bottom: 12px;
 }
 
-.comment-section {
-  padding: 16px 0;
-}
-
-.comment-label {
+.eval-comment {
   font-size: 14px;
   color: #646566;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.comment-text {
-  font-size: 14px;
   line-height: 1.6;
-  color: #323233;
-  padding: 12px;
-  background: #f7f8fa;
-  border-radius: 6px;
-  border-left: 3px solid #ee0a24;
+  margin: 0;
 }
 </style>

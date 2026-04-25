@@ -254,6 +254,8 @@
 
 <script>
 import { Picture, Document, Warning, Loading, Select } from '@element-plus/icons-vue'
+// import { API_BASE_URL } from '@/utils/request'  // 导入动态API地址（使用fetch时需要）
+import request from '@/utils/request'  // 使用axios实例，会走代理
 
 export default {
   name: 'ComplaintManagement',
@@ -322,6 +324,20 @@ export default {
     async getList() {
       this.loading = true
       try {
+        // 使用 axios 会走 proxy 代理，避免跨域问题
+        const params = {
+          skip: (this.pagination.page - 1) * this.pagination.pageSize,
+          limit: this.pagination.pageSize
+        }
+        if (this.queryParams.status) {
+          params.status = this.queryParams.status
+        }
+        
+        const data = await request.get('/manager/complaints', { params })
+        this.complaintList = data.items || []
+        this.pagination.total = data.total || 0
+        
+        /* 旧的 fetch 实现（跨域问题）
         const token = localStorage.getItem('token')
         const params = new URLSearchParams()
         params.append('skip', (this.pagination.page - 1) * this.pagination.pageSize)
@@ -330,7 +346,7 @@ export default {
           params.append('status', this.queryParams.status)
         }
         
-        const response = await fetch(`http://localhost:8088/api/v1/manager/complaints?${params}`, {
+        const response = await fetch(`${API_BASE_URL}/api/v1/manager/complaints?${params}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -343,6 +359,7 @@ export default {
         const data = await response.json()
         this.complaintList = data.items || []
         this.pagination.total = data.total || 0
+        */
       } catch (error) {
         console.error('加载投诉列表失败:', error)
         this.$message.error('加载失败')
@@ -352,8 +369,12 @@ export default {
     },
     async getStats() {
       try {
+        // 使用 axios 会走 proxy 代理
+        this.stats = await request.get('/manager/complaints/stats/summary')
+        
+        /* 旧的 fetch 实现（跨域问题）
         const token = localStorage.getItem('token')
-        const response = await fetch('http://localhost:8088/api/v1/manager/complaints/stats/summary', {
+        const response = await fetch(`${API_BASE_URL}/api/v1/manager/complaints/stats/summary`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -364,6 +385,7 @@ export default {
         }
         
         this.stats = await response.json()
+        */
       } catch (error) {
         console.error('加载统计数据失败:', error)
       }
@@ -402,9 +424,19 @@ export default {
       
       try {
         this.submitting = true
+        
+        // 使用 axios 会走 proxy 代理
+        await request.put(`/manager/complaints/${this.currentComplaint.id}`, this.form)
+        
+        this.$message.success('更新成功')
+        this.dialogVisible = false
+        this.getList()
+        this.getStats()
+        
+        /* 旧的 fetch 实现（跨域问题）
         const token = localStorage.getItem('token')
         
-        const response = await fetch(`http://localhost:8088/api/v1/manager/complaints/${this.currentComplaint.id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/v1/manager/complaints/${this.currentComplaint.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -421,6 +453,7 @@ export default {
         this.dialogVisible = false
         this.getList()
         this.getStats()
+        */
       } catch (error) {
         console.error('更新投诉失败:', error)
         this.$message.error('更新失败，请重试')
@@ -443,8 +476,17 @@ export default {
           type: 'warning'
         })
         
+        // 使用 axios 会走 proxy 代理
+        await request.delete(`/manager/complaints/${row.id}`)
+        
+        this.$message.success('删除成功')
+        this.getList()
+        this.getStats()
+        
+        /* 旧的 fetch 实现（跨域问题）
         const token = localStorage.getItem('token')
-        const response = await fetch(`http://localhost:8088/api/v1/manager/complaints/${row.id}`, {
+        // const response = await fetch(`http://localhost:8088/api/v1/manager/complaints/${row.id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/v1/manager/complaints/${row.id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -458,6 +500,7 @@ export default {
         this.$message.success('删除成功')
         this.getList()
         this.getStats()
+        */
       } catch (error) {
         if (error !== 'cancel') {
           console.error('删除投诉失败:', error)

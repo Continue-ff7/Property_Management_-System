@@ -61,6 +61,12 @@ const routes = [
         name: 'Complaints',
         component: () => import('@/views/complaints/Index.vue'),
         meta: { title: '投诉管理', icon: 'ChatDotSquare' }
+      },
+      {
+        path: 'repair-prices',
+        name: 'RepairPrices',
+        component: () => import('@/views/repair-prices/Index.vue'),
+        meta: { title: '维修价格管理', icon: 'PriceTag' }
       }
     ]
   }
@@ -75,10 +81,9 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   document.title = to.meta.title ? `${to.meta.title} - 智慧物业` : '智慧物业'
   
+  // 每次访问都必须从登录页进入，不自动跳转
   if (to.meta.requiresAuth && !store.getters.isLoggedIn) {
     next('/login')
-  } else if (to.path === '/login' && store.getters.isLoggedIn) {
-    next('/')
   } else {
     next()
   }

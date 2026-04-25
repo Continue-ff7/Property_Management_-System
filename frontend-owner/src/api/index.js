@@ -266,5 +266,12 @@ export const aiAssistantAPI = {
       method: 'post',
       data
     })
+  },
+  // 查询维修参考价格
+  getRepairPrices() {
+    return request({
+      url: '/ai/repair-prices',
+      method: 'get'
+    })
   }
 }

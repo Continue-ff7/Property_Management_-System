@@ -1,7 +1,10 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, field_serializer
 from typing import Optional, List
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
 from decimal import Decimal
+
+# 北京时间时区
+BEIJING_TZ = timezone(timedelta(hours=8))
 
 
 # ============= 用户相关 =============
@@ -119,7 +122,7 @@ class PropertyBase(BaseModel):
     unit: str
     floor: int
     room_number: str
-    area: Decimal
+    area: Optional[Decimal] = None
 
 
 class PropertyCreate(PropertyBase):
@@ -145,8 +148,9 @@ class PropertyWithOwner(PropertyResponse):
 # ============= 楼栋相关 =============
 class BuildingBase(BaseModel):
     name: str
+    units: int
     floors: int
-    units_per_floor: int
+    rooms_per_floor: int
 
 
 class BuildingCreate(BuildingBase):
@@ -261,6 +265,24 @@ class RepairOrderResponse(BaseModel):
     
     class Config:
         from_attributes = True
+    
+    # created_at 是 UTC，其他是北京时间
+    @field_serializer('created_at')
+    def serialize_created_at(self, dt: Optional[datetime]) -> Optional[str]:
+        if dt is None:
+            return None
+        # UTC 转北京时间 (+8小时)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        dt_beijing = dt.astimezone(BEIJING_TZ)
+        return dt_beijing.strftime("%Y-%m-%d %H:%M:%S")
+    
+    @field_serializer('assigned_at', 'started_at', 'completed_at', 'paid_at')
+    def serialize_other_time(self, dt: Optional[datetime]) -> Optional[str]:
+        if dt is None:
+            return None
+        # 直接格式化（已经是北京时间）
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
 class RepairOrderWithDetails(RepairOrderResponse):
@@ -300,6 +322,19 @@ class AnnouncementResponse(BaseModel):
     
     class Config:
         from_attributes = True
+    
+    # 时间字段格式化为ISO格式（带Z表示UTC）
+    @field_serializer('published_at', 'created_at')
+    def serialize_datetime(self, dt: Optional[datetime]) -> Optional[str]:
+        if dt is None:
+            return None
+        # 统一返回ISO格式，前端处理时区转换
+        if dt.tzinfo is None:
+            # 无时区，假设是UTC，加上Z
+            return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        else:
+            # 有时区，转UTC后返回
+            return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class AnnouncementWithPublisher(AnnouncementResponse):
@@ -372,6 +407,35 @@ class OwnerStatistics(BaseModel):
     total_owners: int
     active_owners: int
     total_properties: int
+
+
+# ============= 维修参考价格 =============
+class RepairPriceCreate(BaseModel):
+    category: str
+    item: str
+    price_min: Decimal
+    price_max: Decimal
+    remark: Optional[str] = None
+
+
+class RepairPriceUpdate(BaseModel):
+    category: Optional[str] = None
+    item: Optional[str] = None
+    price_min: Optional[Decimal] = None
+    price_max: Optional[Decimal] = None
+    remark: Optional[str] = None
+
+
+class RepairPriceResponse(BaseModel):
+    id: int
+    category: str
+    item: str
+    price_min: Decimal
+    price_max: Decimal
+    remark: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 
 # ============= 通用响应 =============

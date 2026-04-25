@@ -102,6 +102,14 @@ export const propertyAPI = {
       url: `/manager/properties/${propertyId}/owner`,
       method: 'delete'
     })
+  },
+  // 修改面积
+  updateArea(propertyId, area) {
+    return request({
+      url: `/manager/properties/${propertyId}`,
+      method: 'put',
+      params: { area }
+    })
   }
 }
 
@@ -315,5 +323,21 @@ export const uploadAPI = {
         'Content-Type': 'multipart/form-data'
       }
     })
+  }
+}
+
+// 维修参考价格API
+export const repairPriceAPI = {
+  getList() {
+    return request({ url: '/manager/repair-prices', method: 'get' })
+  },
+  create(data) {
+    return request({ url: '/manager/repair-prices', method: 'post', data })
+  },
+  update(id, data) {
+    return request({ url: `/manager/repair-prices/${id}`, method: 'put', data })
+  },
+  delete(id) {
+    return request({ url: `/manager/repair-prices/${id}`, method: 'delete' })
   }
 }

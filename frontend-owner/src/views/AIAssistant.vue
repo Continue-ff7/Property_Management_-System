@@ -133,7 +133,7 @@ export default {
     const conversationHistory = ref([
       {
         role: 'system',
-        content: '你是一个物业管理系统的AI助手。你可以帮助业主查询账单、报修记录、投诉记录、房产信息，也可以帮助他们提交报修工单和投诉。请用友好、专业的语气回答问题。'
+        content: `你是智慧物业管理系统的AI助手。你可以帮助业主查询账单、报修记录、投诉记录、房产信息，也可以帮助他们提交报修工单和投诉。当用户询问维修费用或价格时，请调用 get_repair_prices 工具获取最新参考价格后再回答，并说明这是参考价，实际以维修人员上门评估为准。请用友好、专业的语气回答问题。`
       }
     ])
     
@@ -224,6 +224,18 @@ export default {
       {
         type: 'function',
         function: {
+          name: 'get_repair_prices',
+          description: '查询物业维修参考价格列表，包括各类维修项目的最低和最高参考价格。当用户询问任何维修费用、价格、收费标准时调用此工具',
+          parameters: {
+            type: 'object',
+            properties: {},
+            required: []
+          }
+        }
+      },
+      {
+        type: 'function',
+        function: {
           name: 'get_complaints',
           description: '查询用户的投诉记录，包括投诉类型、内容、状态、回复等',
           parameters: {
@@ -303,6 +315,17 @@ export default {
             result += `   房产：${repair.property_info}\n`
             result += `   问题：${repair.description}\n`
             result += `   状态：${repair.status_text || repair.status}\n`
+            
+            // 显示维修费用信息（如果有）
+            if (repair.repair_cost && repair.repair_cost > 0) {
+              result += `   维修费用：￥${repair.repair_cost}\n`
+              if (repair.cost_paid) {
+                result += `   支付状态：✅ 已支付\n`
+              } else {
+                result += `   支付状态：⏳ 待支付\n`
+              }
+            }
+            
             result += `   提交时间：${repair.created_at}\n\n`
           })
           
@@ -354,6 +377,23 @@ export default {
           console.error('Error creating repair:', error)
           const errorMsg = error.response?.data?.message || error.message || '未知错误'
           return `创建报修工单失败：${errorMsg}`
+        }
+      },
+      
+      get_repair_prices: async () => {
+        try {
+          const response = await aiAssistantAPI.getRepairPrices()
+          const prices = response.data || []
+          
+          if (prices.length === 0) {
+            return '暂时没有维修参考价格数据，请联系物业了解。'
+          }
+          
+          // 直接返回结构化数据，由 DeepSeek 根据用户问题自行筛选和组织语言
+          return JSON.stringify(prices)
+        } catch (error) {
+          console.error('Error fetching repair prices:', error)
+          return '查询维修价格失败，请稍后重试。'
         }
       },
       
@@ -610,7 +650,8 @@ export default {
           get_properties: '查询房产信息',
           create_repair: '创建报修工单',
           get_complaints: '查询投诉记录',
-          create_complaint: '创建投诉'
+          create_complaint: '创建投诉',
+          get_repair_prices: '查询维修参考价格'
         }
         
         toolMessage.tools.push({
@@ -688,7 +729,10 @@ export default {
       if (chatContainer.value) {
         // 使用 setTimeout 确保 DOM 完全更新后再滚动
         setTimeout(() => {
-          chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+          // 再次检查元素是否存在（防止组件已卸载）
+          if (chatContainer.value) {
+            chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+          }
         }, 0)
       }
     }

@@ -4,20 +4,29 @@ import router from '@/router'
 
 // API基础地址 - 动态检测
 const getApiBaseUrl = () => {
-  // 如果有环境变量配置，优先使用
+  // 生产环境使用相对路径（由Nginx代理）
+  if (process.env.NODE_ENV === 'production') {
+    return ''
+  }
+  
+  // 开发环境：如果有环境变量配置，优先使用
   if (process.env.VUE_APP_API_BASE_URL) {
     return process.env.VUE_APP_API_BASE_URL
   }
   
-  // 否则根据当前访问地址动态决定
+  // 开发环境：否则根据当前访问地址动态决定
   const hostname = window.location.hostname
   
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return 'http://localhost:8088'
   } else {
-    // 使用当前主机的IP地址
+    // 开发环境服务器部署（方案A）
     return `http://${hostname}:8088`
   }
+  
+  // ========== 以下为旧逻辑（已废弃，保留作为参考） ==========
+  // // 使用当前主机的地址，端口改为8000（快解析后端端口）
+  // return `http://${hostname}:8000`
 }
 
 export const API_BASE_URL = getApiBaseUrl()
@@ -30,14 +39,14 @@ export const getWebSocketUrl = (path) => {
 
 // 创建axios实例
 const service = axios.create({
-  baseURL: '/api/v1',
+  baseURL: `${API_BASE_URL}/api/v1`,
   timeout: 15000
 })
 
 // 请求拦截器
 service.interceptors.request.use(
   config => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('manager_token')
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
     }
@@ -69,11 +78,11 @@ service.interceptors.response.use(
           } else {
             // token过期
             ElMessage.error('登录已过期,请重新登录')
-            localStorage.removeItem('token')
+            localStorage.removeItem('manager_token')
             localStorage.removeItem('userInfo')
             router.push('/login')
           }
-          break
+          break;
         case 403:
           ElMessage.error('没有权限访问')
           break

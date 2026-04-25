@@ -1,7 +1,7 @@
 <template>
   <div class="announcements-page">
     <van-nav-bar
-      title="物业管理公告"
+      title="小区公告"
       left-arrow
       @click-left="$router.back()"
       fixed
@@ -133,12 +133,16 @@ export default {
     
     const formatDate = (date) => {
       if (!date) return ''
+      // 解析ISO格式（带Z表示UTC），转为北京时间(+8)
       const d = new Date(date)
-      const year = d.getFullYear()
-      const month = String(d.getMonth() + 1).padStart(2, '0')
-      const day = String(d.getDate()).padStart(2, '0')
-      const hour = String(d.getHours()).padStart(2, '0')
-      const minute = String(d.getMinutes()).padStart(2, '0')
+      // 如果是UTC时间（带Z），new Date会自动转为本地时间
+      // 但我们需要显式处理确保正确
+      const beijingTime = new Date(d.getTime())
+      const year = beijingTime.getFullYear()
+      const month = String(beijingTime.getMonth() + 1).padStart(2, '0')
+      const day = String(beijingTime.getDate()).padStart(2, '0')
+      const hour = String(beijingTime.getHours()).padStart(2, '0')
+      const minute = String(beijingTime.getMinutes()).padStart(2, '0')
       return `${year}-${month}-${day} ${hour}:${minute}`
     }
     
@@ -174,15 +178,20 @@ export default {
   background: white;
   margin: 12px 16px;
   padding: 16px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   cursor: pointer;
   transition: all 0.3s;
+  border: 1px solid #f0f0f0;
 }
 
 .ann-card:active {
   transform: scale(0.98);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.ann-card:first-child {
+  margin-top: 16px;
 }
 
 .card-header {
@@ -194,12 +203,13 @@ export default {
 
 .title {
   flex: 1;
-  font-size: 16px;
-  font-weight: bold;
+  font-size: 17px;
+  font-weight: 600;
   color: #323233;
   line-height: 1.5;
   margin: 0;
   margin-right: 8px;
+  letter-spacing: 0.3px;
 }
 
 .publisher {
@@ -209,18 +219,26 @@ export default {
   font-size: 13px;
   color: #969799;
   margin-bottom: 10px;
+  background: #f7f8fa;
+  padding: 4px 10px;
+  border-radius: 12px;
+  display: inline-flex;
 }
 
 .publisher .van-icon {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .content-text {
   font-size: 14px;
   color: #646566;
-  line-height: 1.6;
+  line-height: 1.7;
   margin-bottom: 12px;
   text-align: justify;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .card-footer {
@@ -234,12 +252,32 @@ export default {
 .time {
   font-size: 12px;
   color: #969799;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.time::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  background: #c8c9cc;
+  border-radius: 50%;
 }
 
 .view-btn {
   font-size: 13px;
-  color: #4A90E2;
+  color: #1989fa;
   font-weight: 500;
+  padding: 4px 12px;
+  background: #e6f2ff;
+  border-radius: 12px;
+  transition: all 0.2s;
+}
+
+.ann-card:active .view-btn {
+  background: #d1e8ff;
 }
 
 /* 详情弹窗样式 */

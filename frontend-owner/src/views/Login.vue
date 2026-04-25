@@ -216,9 +216,10 @@ export default {
         }
         
         // 保存token和用户信息
+        const userInfo = res.user || { username: formData.username, role: loginRole.value }
         await store.dispatch('login', {
           token: res.access_token,
-          userInfo: res.user || { username: formData.username, role: res.user.role }
+          userInfo: userInfo
         })
         
         showToast('登录成功')

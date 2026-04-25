@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     # 数据库配置
     DATABASE_URL: str = "mysql://root:password@localhost:3306/property_management"
     
-    # JWT配置
+    # JWT配置, 默认使用HS256算法,密钥用env覆盖
     SECRET_KEY: str = "your-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7天

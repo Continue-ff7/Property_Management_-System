@@ -41,6 +41,16 @@
           </van-uploader>
         </div>
         
+        <!-- 维修费用 -->
+        <van-cell-group inset style="margin-top: 16px;">
+          <van-field
+            v-model="form.repair_cost"
+            type="number"
+            label="维修费用"
+            placeholder="请输入维修费用（元）"
+          />
+        </van-cell-group>
+        
         <!-- 维修说明 -->
         <van-cell-group inset style="margin-top: 16px;">
           <van-field
@@ -52,26 +62,6 @@
             placeholder="请输入维修说明（选填）"
             show-word-limit
           />
-        </van-cell-group>
-        
-        <!-- ✅ 新增：维修费用输入 -->
-        <van-cell-group inset style="margin-top: 16px;">
-          <van-cell title="维修费用" />
-          <van-field
-            v-model="form.repair_cost"
-            type="number"
-            placeholder="请输入维修费用（元）"
-            input-align="right"
-          >
-            <template #left-icon>
-              <span style="margin-right: 8px; color: #646566;">￥</span>
-            </template>
-          </van-field>
-          <van-cell>
-            <template #title>
-              <span class="cost-tips">ℹ️ 如无需收费，可不填写</span>
-            </template>
-          </van-cell>
         </van-cell-group>
         
         <div style="margin: 24px 16px;">
@@ -107,7 +97,7 @@ export default {
     const form = reactive({
       note: '',
       images: [],
-      repair_cost: ''  // ✅ 新增：维修费用
+      repair_cost: ''
     })
     
     const loadDetail = async () => {
@@ -158,17 +148,13 @@ export default {
       
       submitting.value = true
       try {
-        // ✅ 构造提交数据
         const submitData = {
           repair_images: form.images,
           note: form.note
         }
-        
-        // 如果填写了费用，就包含进去
         if (form.repair_cost && parseFloat(form.repair_cost) > 0) {
           submitData.repair_cost = parseFloat(form.repair_cost)
         }
-        
         await maintenanceWorkorderAPI.completeWork(workorder.value.id, submitData)
         
         showSuccessToast('维修已完成')
@@ -255,12 +241,6 @@ export default {
 .upload-tips {
   margin-top: 4px;
   font-size: 11px;
-  color: #969799;
-}
-
-/* ✅ 新增：费用提示样式 */
-.cost-tips {
-  font-size: 12px;
   color: #969799;
 }
 </style>

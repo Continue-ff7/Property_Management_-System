@@ -202,6 +202,7 @@ import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { repairAPI, maintenanceAPI } from '@/api'
 import { useStore } from 'vuex'
+import { API_BASE_URL } from '@/utils/request'  // 导入动态API地址
 
 export default {
   name: 'Repairs',
@@ -310,7 +311,12 @@ export default {
       if (url.startsWith('http://') || url.startsWith('https://')) {
         return url
       }
+      // 使用动态API地址拼接图片URL
+      return `${API_BASE_URL}${url}`
+      
+      /* 旧的硬编码实现
       return `http://localhost:8088${url}`
+      */
     }
     
     const getUrgencyType = (level) => {

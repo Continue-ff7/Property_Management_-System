@@ -154,13 +154,15 @@ async def get_order_detail(
         "repair_images": order.repair_images,
         "rating": order.rating,
         "comment": order.comment,
+        "repair_cost": float(order.repair_cost) if order.repair_cost else None,
+        "cost_paid": order.cost_paid,
         "created_at": order.created_at,
         "owner_name": order.owner.name,
         "owner_phone": order.owner.phone,
-        "owner_avatar": order.owner.avatar,  # 添加业主头像
+        "owner_avatar": order.owner.avatar,
         "property_info": property_info,
         "maintenance_worker_name": current_user.name,
-        "maintenance_worker_avatar": current_user.avatar  # 添加维修人员头像
+        "maintenance_worker_avatar": current_user.avatar
     }
 
 

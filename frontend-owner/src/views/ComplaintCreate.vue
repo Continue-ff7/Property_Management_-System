@@ -76,6 +76,8 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast, showSuccessToast } from 'vant'
 import { uploadAPI } from '@/api'
+import request from '@/utils/request'  // 使用axios，会走代理
+import { API_BASE_URL } from '@/utils/request'  // 用于图片URL拼接
 
 export default {
   name: 'CreateComplaint',
@@ -115,9 +117,14 @@ export default {
         const res = await uploadAPI.upload(file.file)
         file.status = 'done'
         // 后端返回的是相对路径，需要拼接完整URL
-        const fullUrl = `http://localhost:8088${res.url}`
+        const fullUrl = `${API_BASE_URL}${res.url}`  // 使用动态API地址
         file.url = fullUrl  // 保存完整URL用于预览
         console.log('上传成功:', fullUrl)
+        
+        /* 旧的硬编码实现
+        const fullUrl = `http://localhost:8088${res.url}`
+        file.url = fullUrl
+        */
       } catch (error) {
         file.status = 'failed'
         file.message = '上传失败'
@@ -131,10 +138,25 @@ export default {
       try {
         submitting.value = true
         
-        const token = localStorage.getItem('token')
         // 从 fileList 中提取已上传的图片URL
         const images = fileList.value
           .filter(item => item.url)  // 只取上传成功的
+          .map(item => item.url)
+        
+        // 使用axios走代理，避免跨域
+        await request.post('/complaints', {
+          type: form.value.typeValue,
+          content: form.value.content,
+          images: images
+        })
+        
+        showSuccessToast('提交成功')
+        router.back()
+        
+        /* 旧的fetch实现（跨域问题）
+        const token = localStorage.getItem('token')
+        const images = fileList.value
+          .filter(item => item.url)
           .map(item => item.url)
         
         const response = await fetch('http://localhost:8088/api/v1/complaints', {
@@ -156,6 +178,7 @@ export default {
         
         showSuccessToast('提交成功')
         router.back()
+        */
       } catch (error) {
         console.error('提交投诉失败:', error)
         showToast('提交失败，请重试')

@@ -98,6 +98,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast, showSuccessToast, showImagePreview } from 'vant'
+import request from '@/utils/request'  // 使用axios，会走代理
 
 export default {
   name: 'ComplaintDetail',
@@ -157,6 +158,10 @@ export default {
     
     const loadDetail = async () => {
       try {
+        // 使用axios走代理，避免跨域
+        complaint.value = await request.get(`/complaints/${route.params.id}`)
+        
+        /* 旧的fetch实现（跨域问题）
         const token = localStorage.getItem('token')
         const response = await fetch(`http://localhost:8088/api/v1/complaints/${route.params.id}`, {
           headers: {
@@ -169,6 +174,7 @@ export default {
         }
         
         complaint.value = await response.json()
+        */
       } catch (error) {
         console.error('加载投诉详情失败:', error)
         showToast('加载失败')
@@ -180,6 +186,17 @@ export default {
       
       try {
         submitting.value = true
+        
+        // 使用axios走代理，避免跨域
+        await request.post(`/complaints/${route.params.id}/rate`, { 
+          rating: rating.value 
+        })
+        
+        showSuccessToast('评价成功')
+        showRating.value = false
+        await loadDetail()
+        
+        /* 旧的fetch实现（跨域问题）
         const token = localStorage.getItem('token')
         
         const response = await fetch(`http://localhost:8088/api/v1/complaints/${route.params.id}/rate`, {
@@ -198,6 +215,7 @@ export default {
         showSuccessToast('评价成功')
         showRating.value = false
         await loadDetail()
+        */
       } catch (error) {
         console.error('评价失败:', error)
         showToast('评价失败，请重试')

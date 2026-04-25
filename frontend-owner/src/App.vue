@@ -1,11 +1,25 @@
 <template>
   <div id="app">
     <router-view />
+    
+    <!-- PWA安装引导横幅 -->
+    <div v-if="showInstallBanner" class="pwa-install-banner">
+      <div class="banner-content">
+        <div class="banner-text">
+          <div class="banner-title">📱 安装到桌面</div>
+          <div class="banner-desc">获得更好的使用体验</div>
+        </div>
+        <div class="banner-actions">
+          <button class="btn-install" @click="handleInstall">立即安装</button>
+          <button class="btn-close" @click="closeInstallBanner">×</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
-import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import { showNotify } from 'vant'
@@ -20,6 +34,10 @@ export default {
     let ws = null
     let heartbeatInterval = null  // 心跳定时器
     let reconnectTimer = null  // 重连定时器
+    
+    // PWA安装引导相关
+    const showInstallBanner = ref(false)
+    let deferredPrompt = null  // 保存安装事件
     
     // 消息去重集合（记录最近收到的消息ID）
     const recentMessageIds = new Set()
@@ -282,6 +300,40 @@ export default {
     }
     
     onMounted(() => {
+      // PWA安装引导：监听beforeinstallprompt事件
+      window.addEventListener('beforeinstallprompt', (e) => {
+        console.log('PWA可安装，显示安装引导')
+        // 阻止浏览器默认的安装提示
+        e.preventDefault()
+        // 保存事件，稍后手动触发
+        deferredPrompt = e
+        
+        // 检查用户是否已经关闭过安装提示（7天内）
+        const dismissedUntil = localStorage.getItem('pwa_install_banner_dismissed')
+        if (dismissedUntil) {
+          const now = new Date().getTime()
+          if (now < parseInt(dismissedUntil)) {
+            console.log('用户7天内已关闭过安装提示，不再显示')
+            return
+          } else {
+            // 已过期，清除记录
+            localStorage.removeItem('pwa_install_banner_dismissed')
+          }
+        }
+        
+        // 延迟3秒显示，给用户时间浏览页面
+        setTimeout(() => {
+          showInstallBanner.value = true
+        }, 3000)
+      })
+      
+      // 监听PWA安装成功事件
+      window.addEventListener('appinstalled', () => {
+        console.log('PWA安装成功')
+        showInstallBanner.value = false
+        deferredPrompt = null
+      })
+      
       // 等待用户信息加载
       setTimeout(() => {
         initWebSocket()
@@ -345,6 +397,45 @@ export default {
     onUnmounted(() => {
       closeWebSocket()
     })
+    
+    // PWA安装引导：处理安装按钮点击
+    const handleInstall = async () => {
+      if (!deferredPrompt) {
+        console.log('没有可用的安装提示')
+        return
+      }
+      
+      // 显示浏览器的安装对话框
+      deferredPrompt.prompt()
+      
+      // 等待用户选择
+      const { outcome } = await deferredPrompt.userChoice
+      console.log(`用户选择: ${outcome}`)
+      
+      if (outcome === 'accepted') {
+        console.log('用户接受安装')
+      } else {
+        console.log('用户拒绝安装')
+      }
+      
+      // 隐藏横幅
+      showInstallBanner.value = false
+      deferredPrompt = null
+    }
+    
+    // PWA安装引导：关闭横幅
+    const closeInstallBanner = () => {
+      showInstallBanner.value = false
+      // 记录用户已关闭，7天内不再显示
+      const dismissedUntil = new Date().getTime() + (7 * 24 * 60 * 60 * 1000)
+      localStorage.setItem('pwa_install_banner_dismissed', dismissedUntil)
+    }
+    
+    return {
+      showInstallBanner,
+      handleInstall,
+      closeInstallBanner
+    }
   }
 }
 </script>
@@ -364,5 +455,132 @@ body {
 #app {
   width: 100%;
   min-height: 100vh;
+}
+
+/* PWA安装引导横幅样式 */
+.pwa-install-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(135deg, #1989fa 0%, #1677ff 100%);
+  color: white;
+  padding: 16px 20px;
+  box-shadow: 0 -4px 20px rgba(25, 137, 250, 0.3);
+  z-index: 9999;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.banner-text {
+  flex: 1;
+}
+
+.banner-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.banner-desc {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 16px;
+}
+
+.btn-install {
+  background: white;
+  color: #1989fa;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(25, 137, 250, 0.25);
+}
+
+.btn-install:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.btn-install:active {
+  transform: scale(0.98);
+}
+
+.btn-close {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.btn-close:active {
+  transform: scale(0.9);
+}
+
+/* 移动端适配 */
+@media (max-width: 480px) {
+  .pwa-install-banner {
+    padding: 14px 16px;
+  }
+  
+  .banner-title {
+    font-size: 15px;
+  }
+  
+  .banner-desc {
+    font-size: 12px;
+  }
+  
+  .btn-install {
+    padding: 8px 20px;
+    font-size: 13px;
+  }
+  
+  .btn-close {
+    width: 28px;
+    height: 28px;
+    font-size: 20px;
+  }
 }
 </style>

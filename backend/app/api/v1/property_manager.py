@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from app.core.dependencies import get_current_manager
 from app.core.security import get_password_hash
 from app.models import (
-    User, Property, Bill, RepairOrder, Announcement, FeeStandard, Building,
+    User, Property, Bill, RepairOrder, Announcement, FeeStandard, Building, RepairPrice,
     UserRole, BillStatus, RepairStatus
 )
 from app.schemas import (
@@ -14,7 +14,8 @@ from app.schemas import (
     FeeStandardCreate, FeeStandardUpdate, FeeStandardResponse,
     BuildingCreate, BuildingResponse,
     RevenueStatistics, RepairStatistics, OwnerStatistics,
-    MessageResponse, OwnerCreate, MaintenanceCreate, OwnerUpdate, MaintenanceUpdate
+    MessageResponse, OwnerCreate, MaintenanceCreate, OwnerUpdate, MaintenanceUpdate,
+    RepairPriceCreate, RepairPriceUpdate, RepairPriceResponse
 )
 from typing import List
 from datetime import datetime, date, timedelta
@@ -200,8 +201,31 @@ async def create_building(
     building_data: BuildingCreate,
     current_user: User = Depends(get_current_manager)
 ):
-    """创建楼栋"""
+    """创建楼栋并自动生成房产"""
+    # 创建楼栋
     building = await Building.create(**building_data.model_dump())
+    
+    # 自动生成房产
+    properties_created = 0
+    try:
+        for unit in range(1, building.units + 1):
+            for floor in range(1, building.floors + 1):
+                for room in range(1, building.rooms_per_floor + 1):
+                    room_number = f"{floor * 100 + room}"
+                    await Property.create(
+                        building=building,
+                        unit=str(unit),
+                        floor=floor,
+                        room_number=room_number,
+                        area=None,
+                        owner=None
+                    )
+                    properties_created += 1
+        print(f"[创建楼栋] 成功生成 {properties_created} 套房产")
+    except Exception as e:
+        print(f"[创建楼栋] 生成房产失败: {e}")
+        raise HTTPException(status_code=500, detail=f"生成房产失败: {str(e)}")
+    
     return building
 
 
@@ -316,6 +340,35 @@ async def unbind_property_owner(
     return MessageResponse(message="房产已解绑业主")
 
 
+@router.put("/properties/{property_id}", response_model=PropertyWithOwner)
+async def update_property(
+    property_id: int,
+    area: float,
+    current_user: User = Depends(get_current_manager)
+):
+    """修改房产面积"""
+    property_obj = await Property.get_or_none(id=property_id)
+    if not property_obj:
+        raise HTTPException(status_code=404, detail="房产不存在")
+    
+    property_obj.area = area
+    await property_obj.save()
+    await property_obj.fetch_related("building", "owner")
+    
+    return {
+        "id": property_obj.id,
+        "building_id": property_obj.building_id,
+        "unit": property_obj.unit,
+        "floor": property_obj.floor,
+        "room_number": property_obj.room_number,
+        "area": property_obj.area,
+        "owner_id": property_obj.owner_id,
+        "created_at": property_obj.created_at,
+        "owner_name": property_obj.owner.name if property_obj.owner else None,
+        "building_name": property_obj.building.name
+    }
+
+
 # ============= 账单管理 =============
 @router.get("/fee-standards", response_model=List[FeeStandardResponse])
 async def get_fee_standards(
@@ -332,6 +385,17 @@ async def create_fee_standard(
     current_user: User = Depends(get_current_manager)
 ):
     """创建收费标准"""
+    # 检查是否已存在相同类型的启用标准
+    existing = await FeeStandard.get_or_none(
+        fee_type=standard_data.fee_type,
+        is_active=True
+    )
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"该费用类型已存在启用的标准（ID: {existing.id}），请先禁用旧标准"
+        )
+    
     standard = await FeeStandard.create(**standard_data.model_dump())
     return standard
 
@@ -408,6 +472,11 @@ async def create_bills_batch(
     skipped_count = 0
     
     for property_obj in properties:
+        # 跳过没有面积的房产
+        if property_obj.area is None:
+            skipped_count += 1
+            continue
+        
         # 计算金额（根据面积）
         amount = property_obj.area * standard.unit_price
         
@@ -502,6 +571,9 @@ async def create_bills_for_owner(
 @router.get("/bills", response_model=List[BillWithDetails])
 async def get_all_bills(
     status: str = None,
+    fee_type: str = None,
+    building_id: int = None,
+    property_id: int = None,
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_manager)
@@ -511,6 +583,17 @@ async def get_all_bills(
     
     if status:
         query = query.filter(status=status)
+    
+    if fee_type:
+        query = query.filter(fee_type=fee_type)
+    
+    if building_id:
+        # 获取该楼栋的所有房产ID
+        properties = await Property.filter(building_id=building_id).values_list('id', flat=True)
+        query = query.filter(property_id__in=properties)
+    
+    if property_id:
+        query = query.filter(property_id=property_id)
     
     bills = await query.order_by("-created_at").offset(skip).limit(limit).prefetch_related(
         "owner", "property", "property__building"
@@ -898,14 +981,30 @@ async def get_all_announcements(
     
     result = []
     for ann in announcements:
+        # 时间格式化为ISO UTC格式
+        def format_time(dt):
+            if dt is None:
+                return None
+            from datetime import timezone, timedelta
+            BEIJING_TZ = timezone(timedelta(hours=8))
+            
+            if dt.tzinfo is None:
+                # 无时区，假设是UTC，加Z
+                return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+            else:
+                # 有时区，先去掉时区当成北京时间，再转UTC
+                # 因为服务器时区可能是UTC，但时间值是北京时间
+                dt_beijing = dt.replace(tzinfo=BEIJING_TZ)
+                return dt_beijing.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        
         result.append({
             "id": ann.id,
             "title": ann.title,
             "content": ann.content,
             "publisher_id": ann.publisher_id,
             "is_published": ann.is_published,
-            "published_at": ann.published_at,
-            "created_at": ann.created_at,
+            "published_at": format_time(ann.published_at),
+            "created_at": format_time(ann.created_at),
             "publisher_name": ann.publisher.name
         })
     
@@ -1067,3 +1166,51 @@ async def get_alerts(
         })
     
     return {"alerts": alerts}
+
+
+# ============= 维修参考价格管理 =============
+@router.get("/repair-prices", response_model=List[RepairPriceResponse])
+async def get_repair_prices(
+    current_user: User = Depends(get_current_manager)
+):
+    """获取维修参考价格列表"""
+    return await RepairPrice.all()
+
+
+@router.post("/repair-prices", response_model=RepairPriceResponse)
+async def create_repair_price(
+    data: RepairPriceCreate,
+    current_user: User = Depends(get_current_manager)
+):
+    """新增维修参考价格"""
+    price = await RepairPrice.create(**data.model_dump())
+    return price
+
+
+@router.put("/repair-prices/{price_id}", response_model=RepairPriceResponse)
+async def update_repair_price(
+    price_id: int,
+    data: RepairPriceUpdate,
+    current_user: User = Depends(get_current_manager)
+):
+    """修改维修参考价格"""
+    price = await RepairPrice.get_or_none(id=price_id)
+    if not price:
+        raise HTTPException(status_code=404, detail="价格记录不存在")
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    await price.update_from_dict(update_data)
+    await price.save()
+    return price
+
+
+@router.delete("/repair-prices/{price_id}", response_model=MessageResponse)
+async def delete_repair_price(
+    price_id: int,
+    current_user: User = Depends(get_current_manager)
+):
+    """删除维修参考价格"""
+    price = await RepairPrice.get_or_none(id=price_id)
+    if not price:
+        raise HTTPException(status_code=404, detail="价格记录不存在")
+    await price.delete()
+    return MessageResponse(message="删除成功")

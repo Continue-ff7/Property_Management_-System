@@ -2,7 +2,8 @@
 
 import { register } from 'register-service-worker'
 
-if (process.env.NODE_ENV === 'production') {
+// 开发环境和生产环境都启用PWA（本地localhost可以用HTTP）
+if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'development') {
   register(`${process.env.BASE_URL}service-worker.js`, {
     ready () {
       console.log(

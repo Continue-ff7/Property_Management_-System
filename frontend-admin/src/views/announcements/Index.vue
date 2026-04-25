@@ -166,7 +166,16 @@ export default {
     }
     
     const formatDate = (date) => {
-      return new Date(date).toLocaleString('zh-CN')
+      if (!date) return '-'
+      // 解析ISO格式（带Z表示UTC），转为北京时间显示
+      const d = new Date(date)
+      const year = d.getFullYear()
+      const month = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      const hour = String(d.getHours()).padStart(2, '0')
+      const minute = String(d.getMinutes()).padStart(2, '0')
+      const second = String(d.getSeconds()).padStart(2, '0')
+      return `${year}/${month}/${day} ${hour}:${minute}:${second}`
     }
     
     onMounted(() => {

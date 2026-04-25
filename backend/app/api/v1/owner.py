@@ -907,17 +907,49 @@ async def chat_with_ai(
     current_user: User = Depends(get_current_owner)
 ):
     """与AI客服进行对话咨询"""
-    # 这里应该集成AI服务，简化处理返回模拟回复
-    from app.models import ChatMessage
+    from app.models import ChatMessage, RepairPrice
     
-    # 简单的规则回复
+    message = chat_data.message.lower()
+    
+    # 从数据库读取维修参考价格
+    all_prices = await RepairPrice.all()
+    repair_prices = {}
+    for p in all_prices:
+        # 用类别和项目名作为关键词
+        key = p.item
+        remark_str = f"，{p.remark}" if p.remark else ""
+        repair_prices[key] = f"{p.item}：{int(p.price_min)}-{int(p.price_max)}元{remark_str}"
+        # 同时用类别名作为关键词（方便模糊匹配）
+        if p.category not in repair_prices:
+            repair_prices[p.category] = f"{p.item}：{int(p.price_min)}-{int(p.price_max)}元{remark_str}"
+    
+    # 检查是否询问维修费用
+    price_keywords = ["多少钱", "费用", "价格", "收费", "贵不贵", "怎么收费"]
+    is_price_query = any(kw in message for kw in price_keywords)
+    
+    # 默认回复
     reply = "您好，我是AI客服助手。您的问题已收到，物业工作人员会尽快为您处理。如需紧急服务，请拨打24小时服务热线：400-123-4567"
     
-    if "报修" in chat_data.message or "维修" in chat_data.message:
-        reply = "如需报修，请在报修管理中提交工单，我们会在2小时内安排维修人员处理。紧急情况请选择'紧急'级别。"
-    elif "缴费" in chat_data.message or "账单" in chat_data.message:
+    if is_price_query:
+        # 查找匹配的维修项目
+        matched_items = []
+        for keyword, price_info in repair_prices.items():
+            if keyword in message:
+                matched_items.append(price_info)
+        
+        if matched_items:
+            reply = "【维修参考价格】\\n" + "\\n".join(matched_items) + "\\n\\n注：以上价格为参考价，实际费用以维修人员上门评估为准。"
+        else:
+            reply = "【常见维修参考价格】\\n"
+            for price_info in list(repair_prices.values())[:5]:
+                reply += price_info + "\\n"
+            reply += "\\n如需了解其他项目价格，请具体说明（如：修马桶多少钱）"
+    
+    elif "报修" in message or "维修" in message:
+        reply = "如需报修，请在'报修管理'中提交工单，我们会在2小时内安排维修人员处理。\\n\\n您也可以先询问维修费用，我会为您提供参考价格。"
+    elif "缴费" in message or "账单" in message:
         reply = "您可以在'账单管理'中查看所有账单，支持在线支付。如有疑问，请联系物业管理处。"
-    elif "公告" in chat_data.message:
+    elif "公告" in message:
         reply = "小区公告已在首页发布，请及时查看。重要通知我们也会通过短信方式通知您。"
     
     message = await ChatMessage.create(

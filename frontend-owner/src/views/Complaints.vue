@@ -1,7 +1,7 @@
 <template>
   <div class="complaints-page">
     <van-nav-bar 
-      title="物业投诉" 
+      title="我要投诉" 
       left-arrow
       @click-left="$router.back()"
       fixed 
@@ -58,6 +58,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 import { showToast } from 'vant'
+import request from '@/utils/request'  // 使用axios，会走代理
 
 export default {
   name: 'Complaints',
@@ -129,6 +130,10 @@ export default {
     
     const loadComplaints = async () => {
       try {
+        // 使用axios走代理，避免跨域
+        complaints.value = await request.get('/complaints')
+        
+        /* 旧的fetch实现（跨域问题）
         const token = localStorage.getItem('token')
         const response = await fetch('http://localhost:8088/api/v1/complaints', {
           headers: {
@@ -141,6 +146,7 @@ export default {
         }
         
         complaints.value = await response.json()
+        */
       } catch (error) {
         console.error('加载投诉列表失败:', error)
         showToast('加载失败')

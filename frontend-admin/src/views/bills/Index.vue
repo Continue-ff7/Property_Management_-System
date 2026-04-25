@@ -5,20 +5,32 @@
         <!-- 账单管理 -->
         <el-tab-pane label="账单管理" name="bills">
           <div class="toolbar">
-            <el-select v-model="filterStatus" placeholder="账单状态" clearable style="width: 150px" @change="loadBills">
+            <el-select v-model="filterStatus" placeholder="账单状态" clearable style="width: 120px" @change="loadBills">
               <el-option label="全部" value="" />
               <el-option label="未支付" value="unpaid" />
               <el-option label="已支付" value="paid" />
               <el-option label="已逾期" value="overdue" />
             </el-select>
             
-            <el-select v-model="filterFeeType" placeholder="费用类型" clearable style="width: 150px" @change="loadBills">
+            <el-select v-model="filterFeeType" placeholder="费用类型" clearable style="width: 120px" @change="loadBills">
               <el-option label="全部" value="" />
               <el-option label="物业费" value="property" />
               <el-option label="停车费" value="parking" />
               <el-option label="水费" value="water" />
               <el-option label="电费" value="electricity" />
             </el-select>
+            
+            <el-select v-model="filterBuilding" placeholder="选择楼栋" clearable style="width: 140px" @change="handleBuildingChange">
+              <el-option label="全部楼栋" value="" />
+              <el-option v-for="building in buildings" :key="building.id" :label="building.name" :value="building.id" />
+            </el-select>
+            
+            <el-select v-model="filterProperty" placeholder="选择房产" clearable style="width: 180px" @change="loadBills" :disabled="!filterBuilding">
+              <el-option label="全部房产" value="" />
+              <el-option v-for="prop in buildingProperties" :key="prop.id" :label="prop.unit + '单元' + prop.room_number" :value="prop.id" />
+            </el-select>
+            
+            <el-button type="default" icon="Refresh" @click="resetFilters">重置</el-button>
             
             <div style="flex: 1"></div>
             
@@ -148,7 +160,7 @@
         <el-form-item label="房产">
           <el-select 
             v-model="billForm.property_id" 
-            placeholder="请先选择业主" 
+            placeholder="请选择房产"
             :disabled="!billForm.owner_id"
             style="width: 100%"
           >
@@ -300,10 +312,14 @@ export default {
     
     const filterStatus = ref('')
     const filterFeeType = ref('')
+    const filterBuilding = ref('')
+    const filterProperty = ref('')
     const bills = ref([])
     const standards = ref([])
     const owners = ref([])
     const ownerProperties = ref([])
+    const buildings = ref([])
+    const buildingProperties = ref([])
     
     const pagination = reactive({
       page: 1,
@@ -352,6 +368,8 @@ export default {
         }
         if (filterStatus.value) params.status = filterStatus.value
         if (filterFeeType.value) params.fee_type = filterFeeType.value
+        if (filterBuilding.value) params.building_id = filterBuilding.value
+        if (filterProperty.value) params.property_id = filterProperty.value
         
         const data = await billAPI.getList(params)
         bills.value = data
@@ -379,6 +397,46 @@ export default {
       } finally {
         standardsLoading.value = false
       }
+    }
+    
+    // 加载楼栋列表
+    const loadBuildings = async () => {
+      try {
+        const data = await propertyAPI.getBuildings()
+        buildings.value = data
+      } catch (error) {
+        console.error('加载楼栋失败:', error)
+      }
+    }
+    
+    // 楼栋变化时加载房产
+    const handleBuildingChange = async (buildingId) => {
+      filterProperty.value = ''
+      buildingProperties.value = []
+      
+      if (!buildingId) {
+        loadBills()
+        return
+      }
+      
+      try {
+        const data = await propertyAPI.getList({ building_id: buildingId, limit: 1000 })
+        buildingProperties.value = data
+        loadBills()
+      } catch (error) {
+        console.error('加载房产失败:', error)
+      }
+    }
+    
+    // 重置筛选
+    const resetFilters = () => {
+      filterStatus.value = ''
+      filterFeeType.value = ''
+      filterBuilding.value = ''
+      filterProperty.value = ''
+      buildingProperties.value = []
+      pagination.page = 1
+      loadBills()
     }
     
     // 加载业主列表
@@ -533,6 +591,17 @@ export default {
         return
       }
       
+      // 创建时检查是否已存在相同类型的启用标准
+      if (!isEditStandard.value) {
+        const existingActive = standards.value.find(
+          s => s.fee_type === standardForm.fee_type && s.is_active
+        )
+        if (existingActive) {
+          ElMessage.warning('该费用类型已存在启用的标准，请先禁用旧标准或直接编辑')
+          return
+        }
+      }
+      
       submitting.value = true
       try {
         if (isEditStandard.value) {
@@ -542,7 +611,23 @@ export default {
           })
           ElMessage.success('更新成功')
         } else {
-          await billAPI.createStandard(standardForm)
+          // 根据费用类型映射name和unit
+          const feeTypeMap = {
+            'property': { name: '物业费', unit: '元/㎡/月' },
+            'parking': { name: '停车费', unit: '元/月' },
+            'water': { name: '水费', unit: '元/吨' },
+            'electricity': { name: '电费', unit: '元/度' }
+          }
+          
+          const typeInfo = feeTypeMap[standardForm.fee_type]
+          
+          await billAPI.createStandard({
+            fee_type: standardForm.fee_type,
+            name: typeInfo.name,
+            unit_price: standardForm.unit_price,
+            unit: typeInfo.unit,
+            description: standardForm.description || ''
+          })
           ElMessage.success('创建成功')
         }
         standardDialogVisible.value = false
@@ -639,15 +724,17 @@ export default {
     
     onMounted(() => {
       loadBills()
+      loadBuildings()
     })
     
     return {
       activeTab, loading, standardsLoading, submitting,
-      filterStatus, filterFeeType, bills, standards, owners, ownerProperties,
+      filterStatus, filterFeeType, filterBuilding, filterProperty, bills, standards, owners, ownerProperties,
+      buildings, buildingProperties,
       pagination, batchDialogVisible, createDialogVisible, standardDialogVisible, detailDialogVisible,
       isEdit, isEditStandard, currentBill, suggestedAmount,
       billForm, batchForm, standardForm,
-      loadBills, loadStandards, loadOwners, handleOwnerChange, handleFeeTypeChange,
+      loadBills, loadStandards, loadOwners, handleOwnerChange, handleFeeTypeChange, handleBuildingChange, resetFilters,
       showCreateDialog, handleCreateBill, showBatchDialog, handleBatchCreate,
       showStandardDialog, editStandard, handleStandardSubmit, toggleStandard,
       deleteBill, viewDetail, handleTabChange,

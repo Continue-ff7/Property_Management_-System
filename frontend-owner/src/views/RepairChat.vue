@@ -86,7 +86,9 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useStore } from 'vuex'
 import { showToast } from 'vant'
-import { getWebSocketUrl, API_BASE_URL, getImageUrl } from '@/utils/request'
+// import { getWebSocketUrl, API_BASE_URL, getImageUrl } from '@/utils/request'  // 使用fetch时需要
+import { getWebSocketUrl, getImageUrl } from '@/utils/request'  // WebSocket和图片URL
+import request from '@/utils/request'  // 使用axios，会走代理
 
 export default {
   name: 'RepairChat',
@@ -147,52 +149,37 @@ export default {
         let apiUrl
         if (isOwner) {
           console.log('✅ 业主端：调用 /api/v1/owner/repairs')
-          // 业主端：获取自己的工单
-          const response = await fetch(`${API_BASE_URL}/api/v1/owner/repairs`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
+          // 业主端：获取自己的工单（使用axios走代理）
+          const repairs = await request.get('/owner/repairs')
+          workorder.value = repairs.find(r => r.id === parseInt(repairId))
+          if (workorder.value) {
+            if (workorder.value.maintenance_worker_name) {
+              otherUserName.value = workorder.value.maintenance_worker_name
+              chatTitle.value = `与维修人员：${workorder.value.maintenance_worker_name}`
             }
+            // 设置维修人员头像
+            if (workorder.value.maintenance_worker_avatar) {
+              otherAvatar.value = getImageUrl(workorder.value.maintenance_worker_avatar)
+              console.log('✅ 设置维修人员头像:', otherAvatar.value)
+            } else {
+              console.log('⚠️ 工单中没有 maintenance_worker_avatar 字段')
+            }
+          }
+          /* 旧的fetch实现
+          const response = await fetch(`${API_BASE_URL}/api/v1/owner/repairs`, {
+            headers: {'Authorization': `Bearer ${token}`}
           })
           if (response.ok) {
             const repairs = await response.json()
             workorder.value = repairs.find(r => r.id === parseInt(repairId))
-            if (workorder.value) {
-              if (workorder.value.maintenance_worker_name) {
-                otherUserName.value = workorder.value.maintenance_worker_name
-                chatTitle.value = `与维修人员：${workorder.value.maintenance_worker_name}`
-              }
-              // 设置维修人员头像
-              if (workorder.value.maintenance_worker_avatar) {
-                otherAvatar.value = getImageUrl(workorder.value.maintenance_worker_avatar)
-                console.log('✅ 设置维修人员头像:', otherAvatar.value)
-              } else {
-                console.log('⚠️ 工单中没有 maintenance_worker_avatar 字段')
-              }
-            }
+            ...
           }
+          */
         } else {
           console.log('✅ 维修人员端：调用 /api/v1/maintenance/orders/' + repairId)
-          // 维修人员端：获取分配给自己的工单
-          const response = await fetch(`${API_BASE_URL}/api/v1/maintenance/orders/${repairId}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          })
-          
-          if (!response.ok) {
-            console.error(`❗ API 调用失败: ${response.status} ${response.statusText}`)
-            if (response.status === 403) {
-              console.error('⚠️ 403 Forbidden: 这个工单没有分配给当前维修人员')
-              showToast('您没有权限查看这个工单')
-            } else if (response.status === 404) {
-              console.error('⚠️ 404 Not Found: 工单不存在')
-              showToast('工单不存在')
-            }
-            return
-          }
-          
-          if (response.ok) {
-            workorder.value = await response.json()
+          // 维修人员端：获取分配给自己的工单（使用axios走代理）
+          try {
+            workorder.value = await request.get(`/maintenance/orders/${repairId}`)
             if (workorder.value) {
               if (workorder.value.owner_name) {
                 otherUserName.value = workorder.value.owner_name
@@ -206,7 +193,40 @@ export default {
                 console.log('⚠️ 工单中没有 owner_avatar 字段')
               }
             }
+          } catch (error) {
+            console.error('❗ API 调用失败:', error)
+            if (error.response) {
+              if (error.response.status === 403) {
+                console.error('⚠️ 403 Forbidden: 这个工单没有分配给当前维修人员')
+                showToast('您没有权限查看这个工单')
+              } else if (error.response.status === 404) {
+                console.error('⚠️ 404 Not Found: 工单不存在')
+                showToast('工单不存在')
+              }
+            }
+            return
           }
+          
+          /* 旧的fetch实现
+          const response = await fetch(`${API_BASE_URL}/api/v1/maintenance/orders/${repairId}`, {
+            headers: {'Authorization': `Bearer ${token}`}
+          })
+          if (!response.ok) {
+            console.error(`❗ API 调用失败: ${response.status} ${response.statusText}`)
+            if (response.status === 403) {
+              console.error('⚠️ 403 Forbidden: 这个工单没有分配给当前维修人员')
+              showToast('您没有权限查看这个工单')
+            } else if (response.status === 404) {
+              console.error('⚠️ 404 Not Found: 工单不存在')
+              showToast('工单不存在')
+            }
+            return
+          }
+          if (response.ok) {
+            workorder.value = await response.json()
+            ...
+          }
+          */
         }
       } catch (error) {
         console.error('获取工单信息失败:', error)
@@ -216,11 +236,21 @@ export default {
     // 加载历史聊天记录
     const loadChatHistory = async () => {
       try {
+        // 使用axios走代理
+        const history = await request.get(`/chat/history/${repairId}`)
+        messages.value = history.map(msg => ({
+          id: msg.id,
+          text: msg.message,
+          timestamp: new Date(msg.timestamp),
+          isMine: msg.sender_id === userInfo.value?.id,
+          senderName: msg.sender_name
+        }))
+        scrollToBottom()
+        
+        /* 旧的fetch实现
         const token = localStorage.getItem('token')
         const response = await fetch(`${API_BASE_URL}/api/v1/chat/history/${repairId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: {'Authorization': `Bearer ${token}`}
         })
         if (response.ok) {
           const history = await response.json()
@@ -233,8 +263,9 @@ export default {
           }))
           scrollToBottom()
         } else {
-          console.error('加载历史消息失败:', response.status)
+          console.error('加载历史记录失败:', response.statusText)
         }
+        */
       } catch (error) {
         console.error('加载历史消息失败:', error)
       }

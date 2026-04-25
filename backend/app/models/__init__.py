@@ -31,8 +31,9 @@ class Building(Model):
     """楼栋表"""
     id = fields.IntField(pk=True)
     name = fields.CharField(max_length=50, description="楼栋名称")
+    units = fields.IntField(description="单元数")
     floors = fields.IntField(description="楼层数")
-    units_per_floor = fields.IntField(description="每层单元数")
+    rooms_per_floor = fields.IntField(description="每层房间数")
     created_at = fields.DatetimeField(auto_now_add=True)
     
     class Meta:
@@ -46,7 +47,7 @@ class Property(Model):
     unit = fields.CharField(max_length=20, description="单元号")
     floor = fields.IntField(description="楼层")
     room_number = fields.CharField(max_length=20, description="房间号")
-    area = fields.DecimalField(max_digits=10, decimal_places=2, description="面积（平方米）")
+    area = fields.DecimalField(max_digits=10, decimal_places=2, null=True, description="面积（平方米）")
     owner = fields.ForeignKeyField("models.User", related_name="properties", null=True, description="业主")
     created_at = fields.DatetimeField(auto_now_add=True)
     
@@ -230,3 +231,19 @@ class Complaint(Model):
     class Meta:
         table = "complaints"
         ordering = ["-created_at"]
+
+
+class RepairPrice(Model):
+    """维修参考价格表"""
+    id = fields.IntField(pk=True)
+    category = fields.CharField(max_length=50, description="维修类别，如：灯具、水管")
+    item = fields.CharField(max_length=100, description="维修项目，如：换灯泡、疏通马桶")
+    price_min = fields.DecimalField(max_digits=10, decimal_places=2, description="最低参考价格")
+    price_max = fields.DecimalField(max_digits=10, decimal_places=2, description="最高参考价格")
+    remark = fields.CharField(max_length=255, null=True, description="备注说明")
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "repair_prices"
+        ordering = ["category", "item"]

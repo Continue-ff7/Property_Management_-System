@@ -52,6 +52,11 @@
           <el-icon><ChatDotSquare /></el-icon>
           <template #title>投诉管理</template>
         </el-menu-item>
+        
+        <el-menu-item index="/repair-prices">
+          <el-icon><PriceTag /></el-icon>
+          <template #title>维修价格管理</template>
+        </el-menu-item>
       </el-menu>
     </aside>
     
@@ -99,14 +104,14 @@ import { useStore } from 'vuex'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import {
   DataAnalysis, User, OfficeBuilding, Tickets, Tools, UserFilled, Bell, ChatDotSquare,
-  Fold, Expand, SwitchButton
+  Fold, Expand, SwitchButton, PriceTag
 } from '@element-plus/icons-vue'
 
 export default {
   name: 'Layout',
   components: {
     DataAnalysis, User, OfficeBuilding, Tickets, Tools, UserFilled, Bell, ChatDotSquare,
-    Fold, Expand, SwitchButton
+    Fold, Expand, SwitchButton, PriceTag
   },
   setup() {
     const route = useRoute()

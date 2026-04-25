@@ -16,7 +16,8 @@
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column prop="name" label="楼栋名称" />
             <el-table-column prop="floors" label="楼层数" />
-            <el-table-column prop="units_per_floor" label="每层单元数" />
+            <el-table-column prop="units" label="单元数" />
+                        <el-table-column prop="rooms_per_floor" label="每层房间数" />
           </el-table>
         </el-tab-pane>
         
@@ -53,9 +54,16 @@
                 <el-tag v-else type="info">未分配</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="200" fixed="right">
+            <el-table-column label="操作" width="280" fixed="right">
               <template #default="{ row }">
                 <div class="table-actions">
+                  <el-button 
+                    size="small" 
+                    type="info"
+                    @click="showEditAreaDialog(row)"
+                  >
+                    编辑面积
+                  </el-button>
                   <el-button 
                     v-if="!row.owner_id" 
                     size="small" 
@@ -89,9 +97,15 @@
         <el-form-item label="楼层数">
           <el-input-number v-model="buildingForm.floors" :min="1" />
         </el-form-item>
-        <el-form-item label="每层单元数">
-          <el-input-number v-model="buildingForm.units_per_floor" :min="1" />
+        <el-form-item label="单元数">
+          <el-input-number v-model="buildingForm.units" :min="1" />
         </el-form-item>
+        <el-form-item label="每层房间数">
+          <el-input-number v-model="buildingForm.rooms_per_floor" :min="1" />
+        </el-form-item>
+        <el-alert type="info" :closable="false" style="margin-top: 10px">
+          将自动生成 {{ buildingForm.units * buildingForm.floors * buildingForm.rooms_per_floor }} 套房产
+        </el-alert>
       </el-form>
       
       <template #footer>
@@ -170,6 +184,27 @@
         </el-button>
       </template>
     </el-dialog>
+    
+    <!-- 编辑面积对话框 -->
+    <el-dialog v-model="editAreaDialogVisible" title="编辑面积" width="400px">
+      <div style="padding: 10px 20px;">
+        <div style="margin-bottom: 20px;">
+          <span style="color: #606266; font-size: 14px; display: inline-block; width: 80px;">房间：</span>
+          <span style="font-size: 14px; color: #303133;">{{ currentProperty?.building_name }} {{ currentProperty?.unit }}单元 {{ currentProperty?.room_number }}</span>
+        </div>
+        <div style="display: flex; align-items: center;">
+          <span style="color: #606266; font-size: 14px; display: inline-block; width: 80px;">面积(㎡)：</span>
+          <el-input-number v-model="editAreaValue" :min="0" :precision="2" style="width: 180px;" />
+        </div>
+      </div>
+      
+      <template #footer>
+        <el-button @click="editAreaDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleEditArea" :loading="editingArea">
+          确定
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -193,6 +228,9 @@ export default {
     const assignDialogVisible = ref(false)
     const assigning = ref(false)
     const ownersLoading = ref(false)
+    const editAreaDialogVisible = ref(false)
+    const editingArea = ref(false)
+    const editAreaValue = ref(0)
     
     const owners = ref([])
     const currentProperty = ref(null)
@@ -200,8 +238,9 @@ export default {
     
     const buildingForm = reactive({
       name: '',
+      units: 1,
       floors: 1,
-      units_per_floor: 1
+      rooms_per_floor: 1
     })
     
     const propertyForm = reactive({
@@ -254,7 +293,7 @@ export default {
     }
     
     const showBuildingDialog = () => {
-      Object.assign(buildingForm, { name: '', floors: 1, units_per_floor: 1 })
+      Object.assign(buildingForm, { name: '', units: 1, floors: 1, rooms_per_floor: 1 })
       buildingDialogVisible.value = true
     }
     
@@ -337,6 +376,27 @@ export default {
       }
     }
     
+    const showEditAreaDialog = (row) => {
+      currentProperty.value = row
+      editAreaValue.value = row.area || 0
+      editAreaDialogVisible.value = true
+    }
+    
+    const handleEditArea = async () => {
+      editingArea.value = true
+      try {
+        await propertyAPI.updateArea(currentProperty.value.id, editAreaValue.value)
+        ElMessage.success('修改成功')
+        editAreaDialogVisible.value = false
+        loadProperties()
+      } catch (error) {
+        console.error('修改失败:', error)
+        ElMessage.error(error.response?.data?.detail || '修改失败')
+      } finally {
+        editingArea.value = false
+      }
+    }
+    
     // Tab切换处理
     const handleTabChange = (tabName) => {
       // 延迟加载，避免 ResizeObserver 错误
@@ -355,9 +415,11 @@ export default {
     return {
       activeTab, buildingsLoading, propertiesLoading, buildings, properties, filterBuilding,
       buildingDialogVisible, propertyDialogVisible, assignDialogVisible, assigning, ownersLoading,
+      editAreaDialogVisible, editingArea, editAreaValue,
       buildingForm, propertyForm, owners, currentProperty, selectedOwnerId,
       loadBuildings, loadProperties, loadOwners, showBuildingDialog, showPropertyDialog, 
       showAssignDialog, handleAddBuilding, handleAddProperty, handleAssign, unbindOwner,
+      showEditAreaDialog, handleEditArea,
       handleTabChange
     }
   }

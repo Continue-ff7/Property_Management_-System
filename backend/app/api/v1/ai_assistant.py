@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.models import User, RepairOrder, Bill, Property, Complaint
+from app.models import User, RepairOrder, Bill, Property, Complaint, RepairPrice
 from app.core.dependencies import get_current_user
 from typing import Dict, Any
 
@@ -80,7 +80,10 @@ async def get_user_repairs(current_user: User = Depends(get_current_user)):
                                "中" if repair.urgency_level.value == "medium" else
                                "高" if repair.urgency_level.value == "high" else "紧急",
                 "created_at": repair.created_at.isoformat(),
-                "worker_name": repair.maintenance_worker.name if repair.maintenance_worker else None
+                "worker_name": repair.maintenance_worker.name if repair.maintenance_worker else None,
+                # 维修费用信息
+                "repair_cost": float(repair.repair_cost) if repair.repair_cost else None,
+                "cost_paid": repair.cost_paid
             })
         
         return {
@@ -245,6 +248,33 @@ async def get_user_complaints(current_user: User = Depends(get_current_user)):
             "success": False,
             "data": [],
             "message": f"查询投诉记录失败: {str(e)}"
+        }
+
+
+@router.get("/ai/repair-prices")
+async def get_repair_prices(current_user: User = Depends(get_current_user)):
+    """获取维修参考价格列表"""
+    try:
+        prices = await RepairPrice.all()
+        prices_data = []
+        for p in prices:
+            prices_data.append({
+                "category": p.category,
+                "item": p.item,
+                "price_min": float(p.price_min),
+                "price_max": float(p.price_max),
+                "remark": p.remark
+            })
+        return {
+            "success": True,
+            "data": prices_data,
+            "message": f"共 {len(prices_data)} 条参考价格"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "data": [],
+            "message": f"查询价格失败: {str(e)}"
         }
 
 

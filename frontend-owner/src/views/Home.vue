@@ -26,15 +26,15 @@
       </div>
       <div class="menu-item" @click="goTo('/repairs')">
         <van-icon name="service-o" size="28" color="#f56c6c" />
-        <span>维修工单</span>
+        <span>维修记录</span>
       </div>
       <div class="menu-item" @click="goTo('/announcements')">
         <van-icon name="volume-o" size="28" color="#409eff" />
-        <span>公告通知</span>
+        <span>小区公告</span>
       </div>
       <div class="menu-item" @click="goTo('/complaints')">
         <van-icon name="chat-o" size="28" color="#ff6b6b" />
-        <span>物业投诉</span>
+        <span>我要投诉</span>
       </div>
       <div class="menu-item" @click="goTo('/repair/create')">
         <van-icon name="add-o" size="28" color="#909399" />
@@ -90,8 +90,9 @@
           v-for="item in announcements"
           :key="item.id"
           :title="item.title"
-          :label="item.created_at"
+          :label="formatDate(item.created_at)"
           is-link
+          @click="goTo('/announcements')"
         />
         <van-empty v-if="announcements.length === 0" description="暂无公告" />
       </van-cell-group>
@@ -169,6 +170,14 @@ export default {
       router.push(path)
     }
     
+    const formatDate = (date) => {
+      if (!date) return ''
+      const d = new Date(date)
+      const month = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${month}-${day}`
+    }
+    
     const handleTodoClick = (item) => {
       if (item.type === 'bill') {
         router.push('/bills')
@@ -199,6 +208,7 @@ export default {
       announcements,
       getImageUrl,
       goTo,
+      formatDate,
       handleTodoClick
     }
   }

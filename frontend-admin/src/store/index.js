@@ -2,7 +2,7 @@ import { createStore } from 'vuex'
 
 export default createStore({
   state: {
-    token: localStorage.getItem('token') || '',
+    token: localStorage.getItem('manager_token') || '',
     userInfo: JSON.parse(localStorage.getItem('userInfo') || '{}'),
     sidebarCollapsed: false,
     newRepairNotification: null,  // 新报修通知
@@ -20,7 +20,7 @@ export default createStore({
   mutations: {
     SET_TOKEN(state, token) {
       state.token = token
-      localStorage.setItem('token', token)
+      localStorage.setItem('manager_token', token)
     },
     
     SET_USER_INFO(state, userInfo) {
@@ -31,7 +31,7 @@ export default createStore({
     CLEAR_AUTH(state) {
       state.token = ''
       state.userInfo = {}
-      localStorage.removeItem('token')
+      localStorage.removeItem('manager_token')
       localStorage.removeItem('userInfo')
     },
     

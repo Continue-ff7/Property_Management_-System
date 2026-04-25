@@ -1,6 +1,34 @@
 import axios from 'axios'
 import { showToast } from 'vant'
-import store from '@/store'
+
+// 获取当前角色（本地开发版）
+const getCurrentRole = () => {
+  const path = window.location.pathname
+  
+  // 本地开发：pathname 包含 /maintenance
+  if (path.startsWith('/maintenance')) {
+    return 'maintenance'
+  }
+  
+  // 默认业主
+  return 'owner'
+}
+
+// 获取token key
+const getTokenKey = (role) => {
+  return role === 'maintenance' ? 'maintenance_token' : 'owner_token'
+}
+
+// 获取userInfo key
+const getUserInfoKey = (role) => {
+  return role === 'maintenance' ? 'maintenance_userInfo' : 'owner_userInfo'
+}
+
+// 获取当前token（根据当前路径）
+const getToken = () => {
+  const role = getCurrentRole()
+  return localStorage.getItem(getTokenKey(role)) || ''
+}
 
 // 获取后端服务器地址
 // API基础地址 - 动态检测
@@ -10,21 +38,25 @@ const getApiBaseUrl = () => {
     return process.env.VUE_APP_API_BASE_URL
   }
   
-  // 否则根据当前访问地址动态决定
-  const hostname = window.location.hostname
-  
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+  // 本地开发环境
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:8088'
-  } else {
-    // 使用当前主机的IP地址
-    return `http://${hostname}:8088`
   }
+  
+  // 部署环境：使用相对路径，让Nginx代理处理
+  return ''
 }
 
 export const API_BASE_URL = getApiBaseUrl()
 
 // 获取WebSocket地址
 export const getWebSocketUrl = (path) => {
+  // 部署环境（相对路径）：使用 wss:// 或 ws:// 根据当前协议
+  if (API_BASE_URL === '') {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${protocol}//${window.location.host}${path}`
+  }
+  // 本地开发
   const wsUrl = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://')
   return `${wsUrl}${path}`
 }
@@ -41,14 +73,15 @@ export const getImageUrl = (url) => {
 }
 
 const request = axios.create({
-  baseURL: '/api/v1',
+  baseURL: `${API_BASE_URL}/api/v1`,
   timeout: 10000
 })
 
 // 请求拦截器
 request.interceptors.request.use(
   config => {
-    const token = store.state.token
+    // 每次请求都重新获取 token（确保角色判断正确）
+    const token = getToken()
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
     }
@@ -97,7 +130,13 @@ request.interceptors.response.use(
             
             // 设置新的定时器，在跳转前清空token
             logoutTimer = setTimeout(() => {
-              store.commit('CLEAR_TOKEN')
+              // 清除当前角色和所有token
+              localStorage.removeItem('current_role_owner')
+              localStorage.removeItem('current_role_maintenance')
+              localStorage.removeItem('owner_token')
+              localStorage.removeItem('maintenance_token')
+              localStorage.removeItem('owner_userInfo')
+              localStorage.removeItem('maintenance_userInfo')
               window.location.href = '/login'
             }, 1500)
           }
