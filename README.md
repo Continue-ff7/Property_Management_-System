@@ -33,9 +33,10 @@
 
 ```bash
 git clone https://github.com/Continue-ff7/Property_Management_-System.git
-或者 git@github.com:Continue-ff7/Property_Management_-System.git
 cd property-management-system
 ```
+
+> 如果 HTTPS 较慢，也可使用 SSH：`git@github.com:Continue-ff7/Property_Management_-System.git`
 
 ### 2. 配置数据库
 
@@ -128,7 +129,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES=10080
 
 # ========== 跨域配置（必填） ==========
 # 前端直接请求后端 8088 端口，必须配置跨域允许前端地址
-# 本地开发保持默认即可，生产环境修改为实际域名
 CORS_ORIGINS=http://localhost:8080,http://localhost:8081,http://localhost:8082
 
 # ========== 文件上传配置 ==========
@@ -148,6 +148,7 @@ BACKEND_HOST=localhost:8088
 
 在 `frontend-owner` 目录下创建 `.env.development` 文件：
 
+```env
 # DeepSeek API Key（必填，AI 助手功能需要）
 # 从 https://platform.deepseek.com 注册获取
 VUE_APP_DEEPSEEK_API_KEY=sk-your-deepseek-api-key
