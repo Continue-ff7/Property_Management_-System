@@ -32,7 +32,8 @@
 ### 1. 克隆项目
 
 ```bash
-git clone https://github.com/yourusername/property-management-system.git
+git clone https://github.com/Continue-ff7/Property_Management_-System.git
+或者 git@github.com:Continue-ff7/Property_Management_-System.git
 cd property-management-system
 ```
 
@@ -130,7 +131,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES=10080
 # 本地开发保持默认即可，生产环境修改为实际域名
 CORS_ORIGINS=http://localhost:8080,http://localhost:8081,http://localhost:8082
 
-# ========== 文件上传配置（可选） ==========
+# ========== 文件上传配置 ==========
 # 上传文件保存路径，默认 uploads
 UPLOAD_DIR=uploads
 
@@ -141,20 +142,11 @@ MAX_UPLOAD_SIZE=10485760
 # 用于生成发票二维码中的验证 URL，生产环境配置域名
 BACKEND_HOST=localhost:8088
 
-# ========== AI 服务配置（可选） ==========
-# 后端 AI 服务相关配置
-AI_SERVICE_URL=
-AI_SERVICE_KEY=
 ```
 
 ### 前端业主端环境变量（frontend-owner/.env.development）
 
 在 `frontend-owner` 目录下创建 `.env.development` 文件：
-
-```env
-# 后端 API 地址（可选）
-# 本地开发留空即可，会使用相对路径自动适配
-VUE_APP_API_BASE_URL=
 
 # DeepSeek API Key（必填，AI 助手功能需要）
 # 从 https://platform.deepseek.com 注册获取
@@ -179,7 +171,7 @@ property-management-system/
 │   ├── src/
 │   ├── public/
 │   ├── package.json
-│   └── .env.development       # 环境变量（自行创建，不上传）
+│   └── .env.development       # 环境变量（改环境变量可忽略）
 ├── frontend-owner/            # 业主端/维修人员端（Vue3 移动端 + PWA）
 │   ├── src/
 │   ├── public/
@@ -206,12 +198,6 @@ property-management-system/
 
 检查 `backend/.env` 中的 `UPLOAD_DIR` 配置，确保目录存在且有写入权限。
 
-## 注意事项
-
-1. **不要上传 `.env` 文件**：包含数据库密码、API Key 等敏感信息，已添加到 `.gitignore`
-2. **修改默认密钥**：生产环境务必修改 `SECRET_KEY`
-3. **DeepSeek API Key**：AI 助手在前端直接调用 DeepSeek API，仅供学习交流使用，生产环境建议通过后端代理调用
-4. **上传目录权限**：确保 `uploads/` 目录可读写
 
 ## 开源协议
 
